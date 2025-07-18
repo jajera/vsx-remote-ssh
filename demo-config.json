@@ -1,0 +1,78 @@
+{
+  "demoHosts": [
+    {
+      "name": "Local Test Server",
+      "host": "localhost",
+      "port": 22,
+      "username": "demo",
+      "authMethod": "password",
+      "password": "demo123",
+      "description": "Local SSH server for testing"
+    },
+    {
+      "name": "Docker SSH Server",
+      "host": "localhost",
+      "port": 2222,
+      "username": "root",
+      "authMethod": "password",
+      "password": "root",
+      "description": "Docker-based SSH server"
+    }
+  ],
+  "testScenarios": [
+    {
+      "name": "Basic Connection Test",
+      "description": "Test basic SSH connection",
+      "steps": [
+        "Add SSH host configuration",
+        "Test connection",
+        "Verify connection status"
+      ]
+    },
+    {
+      "name": "File System Test",
+      "description": "Test remote file system operations",
+      "steps": [
+        "Open remote workspace",
+        "Create a test file",
+        "Edit and save the file",
+        "Create a directory",
+        "Delete files and directories"
+      ]
+    },
+    {
+      "name": "Terminal Test",
+      "description": "Test remote terminal functionality",
+      "steps": [
+        "Open remote terminal",
+        "Run basic commands (ls, pwd, whoami)",
+        "Test file operations (touch, mkdir, rm)",
+        "Test long-running processes"
+      ]
+    },
+    {
+      "name": "Performance Test",
+      "description": "Test performance monitoring",
+      "steps": [
+        "Enable performance monitoring",
+        "Perform various operations",
+        "Check performance statistics",
+        "Monitor latency and memory usage"
+      ]
+    }
+  ],
+  "setupInstructions": {
+    "localSSH": [
+      "Install OpenSSH server: sudo apt-get install openssh-server",
+      "Start SSH service: sudo systemctl start ssh",
+      "Create test user: sudo useradd -m demo",
+      "Set password: sudo passwd demo",
+      "Test connection: ssh demo@localhost"
+    ],
+    "dockerSSH": [
+      "Run SSH server container: docker run -d -p 2222:22 --name ssh-test linuxserver/openssh-server",
+      "Set root password: docker exec ssh-test echo 'root:root' | chpasswd",
+      "Test connection: ssh root@localhost -p 2222"
+    ]
+  }
+} 

@@ -1,0 +1,14 @@
+name: Markdown Lint
+
+on:
+  pull_request: {}
+
+permissions:
+  statuses: write
+  checks: write
+  contents: read
+  pull-requests: read
+
+jobs:
+  markdown-lint:
+    uses: actionsforge/actions/.github/workflows/markdown-lint.yml@main

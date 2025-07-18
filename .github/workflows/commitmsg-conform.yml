@@ -1,0 +1,14 @@
+name: Commit Message Conformance
+
+on:
+  pull_request: {}
+
+permissions:
+  statuses: write
+  checks: write
+  contents: read
+  pull-requests: read
+
+jobs:
+  commitmsg-conform:
+    uses: actionsforge/actions/.github/workflows/commitmsg-conform.yml@main

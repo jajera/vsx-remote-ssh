@@ -1,0 +1,583 @@
+import * as vscode from 'vscode';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { NotificationService, NotificationLevel, DetailedProgressReporter } from './notification-service';
+
+// Mock VS Code API
+vi.mock('vscode', () => {
+  const mockWebview = {
+    html: '',
+    onDidReceiveMessage: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+    postMessage: vi.fn(),
+    cspSource: 'vscode-webview://test'
+  };
+  
+  const mockWebviewPanel = {
+    webview: mockWebview,
+    dispose: vi.fn(),
+    onDidDispose: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+    reveal: vi.fn()
+  };
+  
+  const mockStatusBarItem = {
+    text: '',
+    tooltip: '',
+    command: '',
+    show: vi.fn(),
+    hide: vi.fn(),
+    dispose: vi.fn()
+  };
+  
+  return {
+    window: {
+      showInformationMessage: vi.fn(),
+      showWarningMessage: vi.fn(),
+      showErrorMessage: vi.fn(),
+      setStatusBarMessage: vi.fn(),
+      showTextDocument: vi.fn(),
+      createStatusBarItem: vi.fn().mockReturnValue(mockStatusBarItem),
+      createWebviewPanel: vi.fn().mockReturnValue(mockWebviewPanel)
+    },
+    workspace: {
+      openTextDocument: vi.fn()
+    },
+    ProgressLocation: {
+      Notification: 15,
+      Window: 10,
+      StatusBar: 1
+    },
+    StatusBarAlignment: {
+      Left: 1,
+      Right: 2
+    },
+    ViewColumn: {
+      One: 1,
+      Two: 2
+    },
+    Uri: {
+      parse: vi.fn()
+    },
+    commands: {
+      executeCommand: vi.fn()
+    }
+  };
+});
+
+describe('NotificationService', () => {
+  let notificationService: NotificationService;
+
+  beforeEach(() => {
+    // Reset the singleton instance
+    // @ts-ignore - Accessing private static property for testing
+    NotificationService.instance = undefined;
+    
+    // Get a fresh instance
+    notificationService = NotificationService.getInstance();
+    
+    // Clear all mocks
+    vi.clearAllMocks();
+  });
+
+  describe('getInstance', () => {
+    it('should return the same instance when called multiple times', () => {
+      const instance1 = NotificationService.getInstance();
+      const instance2 = NotificationService.getInstance();
+      expect(instance1).toBe(instance2);
+    });
+  });
+
+  describe('showNotification', () => {
+    it('should show information message with default options', async () => {
+      vi.mocked(vscode.window.showInformationMessage).mockResolvedValue({ title: 'OK' });
+      
+      const result = await notificationService.showNotification('Test message');
+      
+      expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
+        'Test message',
+        {},
+      );
+      expect(result).toBe('OK');
+    });
+
+    it('should show warning message when level is Warning', async () => {
+      vi.mocked(vscode.window.showWarningMessage).mockResolvedValue({ title: 'OK' });
+      
+      await notificationService.showNotification(
+        'Warning message',
+        NotificationLevel.Warning
+      );
+      
+      expect(vscode.window.showWarningMessage).toHaveBeenCalled();
+    });
+    
+    it('should show error message when level is Error', async () => {
+      vi.mocked(vscode.window.showErrorMessage).mockResolvedValue({ title: 'OK' });
+      
+      await notificationService.showNotification(
+        'Error message',
+        NotificationLevel.Error
+      );
+      
+      expect(vscode.window.showErrorMessage).toHaveBeenCalled();
+    });
+    
+    it('should include custom buttons when showButtons is true', async () => {
+      vi.mocked(vscode.window.showInformationMessage).mockResolvedValue({ title: 'Custom Button' });
+      
+      const result = await notificationService.showNotification(
+        'Test message',
+        NotificationLevel.Info,
+        { showButtons: true, buttons: ['Custom Button'] }
+      );
+      
+      expect(result).toBe('Custom Button');
+    });
+    
+    it('should include modal option when modal is true', async () => {
+      vi.mocked(vscode.window.showInformationMessage).mockResolvedValue({ title: 'OK' });
+      
+      await notificationService.showNotification(
+        'Test message',
+        NotificationLevel.Info,
+        { modal: true }
+      );
+      
+      expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
+        'Test message',
+        { modal: true },
+        undefined
+      );
+    });
+    
+    it('should include "Don\'t show again" button when showDoNotShowAgain is true', async () => {
+      vi.mocked(vscode.window.showInformationMessage).mockResolvedValueOnce({ title: "Don't show again" });
+      
+      await notificationService.showNotification(
+        'Test message',
+        NotificationLevel.Info,
+        { showDoNotShowAgain: true }
+      );
+      
+      expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
+        'Test message',
+        { modal: false },
+        { title: "Don't show again" }
+      );
+    });
+
+    it('should not show notification again if "Don\'t show again" was selected', async () => {
+      // First call, user selects "Don't show again"
+      vi.mocked(vscode.window.showInformationMessage).mockResolvedValueOnce("Don't show again");
+      
+      await notificationService.showNotification(
+        'Suppressible message',
+        NotificationLevel.Info,
+        { showDoNotShowAgain: true }
+      );
+      
+      expect(vscode.window.showInformationMessage).toHaveBeenCalledTimes(1);
+      
+      // Reset mock to verify second call
+      vi.clearAllMocks();
+      
+      // Second call with same message should not show notification
+      await notificationService.showNotification(
+        'Suppressible message',
+        NotificationLevel.Info,
+        { showDoNotShowAgain: true }
+      );
+      
+      expect(vscode.window.showInformationMessage).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('showTroubleshootingNotification', () => {
+    it('should show error message with View Troubleshooting Steps button', async () => {
+      vi.mocked(vscode.window.showErrorMessage).mockResolvedValue(undefined);
+      
+      await notificationService.showTroubleshootingNotification(
+        'Connection failed',
+        ['Check network connectivity', 'Verify SSH credentials']
+      );
+      
+      expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+        'Connection failed',
+        'View Troubleshooting Steps'
+      );
+    });
+
+    it('should open troubleshooting document when View Troubleshooting Steps is clicked', async () => {
+      // Mock user clicking "View Troubleshooting Steps"
+      vi.mocked(vscode.window.showErrorMessage).mockResolvedValue('View Troubleshooting Steps');
+      
+      // Mock document creation and display
+      const mockDocument = { /* mock document */ };
+      vi.mocked(vscode.workspace.openTextDocument).mockResolvedValue(mockDocument as any);
+      
+      await notificationService.showTroubleshootingNotification(
+        'Connection failed',
+        ['Check network connectivity', 'Verify SSH credentials']
+      );
+      
+      // Verify document was created with correct content
+      expect(vscode.workspace.openTextDocument).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: expect.stringContaining('# Troubleshooting Guide'),
+          language: 'markdown'
+        })
+      );
+      
+      // Verify document was shown
+      expect(vscode.window.showTextDocument).toHaveBeenCalledWith(mockDocument);
+    });
+  });
+
+  describe('showTransientStatusMessage', () => {
+    it('should set status bar message with specified duration', () => {
+      notificationService.showTransientStatusMessage('Status message', 5000);
+      
+      expect(vscode.window.setStatusBarMessage).toHaveBeenCalledWith(
+        'Status message',
+        5000
+      );
+    });
+
+    it('should use default duration when not specified', () => {
+      notificationService.showTransientStatusMessage('Default duration');
+      
+      expect(vscode.window.setStatusBarMessage).toHaveBeenCalledWith(
+        'Default duration',
+        3000
+      );
+    });
+  });
+
+  describe('withProgress', () => {
+    it('should call vscode.window.withProgress with correct parameters', async () => {
+      // Mock withProgress
+      vi.mocked(vscode.window).withProgress = vi.fn().mockImplementation((options, task) => {
+        // Simulate calling the task with progress and token
+        const mockProgress = { report: vi.fn() };
+        const mockToken = { isCancellationRequested: false };
+        return task(mockProgress as any, mockToken as any);
+      });
+      
+      // Create a mock task that returns a value
+      const mockTask = vi.fn().mockResolvedValue('task result');
+      
+      const result = await notificationService.withProgress(
+        { title: 'Test Progress' },
+        mockTask
+      );
+      
+      // Verify withProgress was called with correct options
+      expect(vscode.window.withProgress).toHaveBeenCalledWith(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: 'Test Progress',
+          cancellable: false
+        },
+        expect.any(Function)
+      );
+      
+      // Verify task was called
+      expect(mockTask).toHaveBeenCalled();
+      
+      // Verify result was passed through
+      expect(result).toBe('task result');
+    });
+  });
+
+  describe('resetDoNotShowAgainSettings', () => {
+    it('should clear suppressed notifications', async () => {
+      // First suppress a notification
+      vi.mocked(vscode.window.showInformationMessage).mockResolvedValueOnce("Don't show again");
+      
+      await notificationService.showNotification(
+        'Suppressible message',
+        NotificationLevel.Info,
+        { showDoNotShowAgain: true }
+      );
+      
+      // Reset mocks
+      vi.clearAllMocks();
+      
+      // Reset settings
+      await notificationService.resetDoNotShowAgainSettings();
+      
+      // Now the notification should show again
+      vi.mocked(vscode.window.showInformationMessage).mockResolvedValueOnce('OK');
+      
+      await notificationService.showNotification(
+        'Suppressible message',
+        NotificationLevel.Info,
+        { showDoNotShowAgain: true }
+      );
+      
+      // Verify notification was shown again
+      expect(vscode.window.showInformationMessage).toHaveBeenCalled();
+    });
+  });
+
+  describe('showConnectionStatusNotification', () => {
+    it('should show a notification with connection status', async () => {
+      vi.mocked(vscode.window.showInformationMessage).mockResolvedValue('OK');
+      
+      await notificationService.showConnectionStatusNotification(
+        'test-host',
+        'Connected successfully'
+      );
+      
+      expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
+        'SSH Connection: test-host - Connected successfully',
+        {},
+      );
+    });
+
+    it('should add the notification to history', async () => {
+      vi.mocked(vscode.window.showInformationMessage).mockResolvedValue('OK');
+      
+      await notificationService.showConnectionStatusNotification(
+        'test-host',
+        'Connected successfully'
+      );
+      
+      // Call showConnectionStatusHistory to verify the notification was added
+      const mockDocument = { /* mock document */ };
+      vi.mocked(vscode.workspace.openTextDocument).mockResolvedValue(mockDocument as any);
+      
+      await notificationService.showConnectionStatusHistory();
+      
+      // Verify document was created with the connection status
+      expect(vscode.workspace.openTextDocument).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: expect.stringContaining('test-host'),
+          language: 'markdown'
+        })
+      );
+    });
+  });
+
+  describe('showConnectionStatusHistory', () => {
+    it('should show a notification when history is empty', async () => {
+      vi.mocked(vscode.window.showInformationMessage).mockResolvedValue('OK');
+      
+      // Ensure history is empty
+      // @ts-ignore - Accessing private property for testing
+      notificationService.connectionStatusHistory = [];
+      
+      await notificationService.showConnectionStatusHistory();
+      
+      expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
+        'No connection status history',
+        expect.anything()
+      );
+    });
+
+    it('should open a document with history when history exists', async () => {
+      // Add some history first
+      vi.mocked(vscode.window.showInformationMessage).mockResolvedValue('OK');
+      
+      await notificationService.showConnectionStatusNotification(
+        'test-host-1',
+        'Connected successfully'
+      );
+      
+      await notificationService.showConnectionStatusNotification(
+        'test-host-2',
+        'Connection failed'
+      );
+      
+      // Mock document creation and display
+      const mockDocument = { /* mock document */ };
+      vi.mocked(vscode.workspace.openTextDocument).mockResolvedValue(mockDocument as any);
+      
+      await notificationService.showConnectionStatusHistory();
+      
+      // Verify document was created with both connection statuses
+      expect(vscode.workspace.openTextDocument).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: expect.stringContaining('test-host-1'),
+          language: 'markdown'
+        })
+      );
+      
+      expect(vscode.workspace.openTextDocument).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: expect.stringContaining('test-host-2'),
+          language: 'markdown'
+        })
+      );
+      
+      // Verify document was shown
+      expect(vscode.window.showTextDocument).toHaveBeenCalledWith(mockDocument);
+    });
+  });
+
+  describe('showSetupGuidance', () => {
+    it('should show an information message with View Setup Guide button', async () => {
+      vi.mocked(vscode.window.showInformationMessage).mockResolvedValue(undefined);
+      
+      await notificationService.showSetupGuidance(
+        'SSH Setup Guide',
+        [
+          {
+            title: 'Generate SSH Key',
+            description: 'Generate a new SSH key pair'
+          }
+        ]
+      );
+      
+      expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
+        'SSH Setup Guide',
+        'View Setup Guide'
+      );
+    });
+
+    it('should create a webview panel when View Setup Guide is clicked', async () => {
+      // Mock user clicking "View Setup Guide"
+      vi.mocked(vscode.window.showInformationMessage).mockResolvedValue('View Setup Guide');
+      
+      const steps = [
+        {
+          title: 'Generate SSH Key',
+          description: 'Generate a new SSH key pair',
+          command: 'ssh-remote.generateKey'
+        },
+        {
+          title: 'Configure SSH Host',
+          description: 'Add the host to your SSH config',
+          documentationLink: 'https://example.com/docs'
+        }
+      ];
+      
+      await notificationService.showSetupGuidance('SSH Setup Guide', steps);
+      
+      // Verify webview panel was created
+      expect(vscode.window.createWebviewPanel).toHaveBeenCalledWith(
+        'sshSetupGuide',
+        'SSH Setup Guide',
+        vscode.ViewColumn.One,
+        expect.objectContaining({
+          enableScripts: true,
+          retainContextWhenHidden: true
+        })
+      );
+      
+      // Verify HTML content was set
+      const mockWebviewPanel = vi.mocked(vscode.window.createWebviewPanel).mock.results[0].value;
+      expect(mockWebviewPanel.webview.html).toContain('SSH Setup Guide');
+      expect(mockWebviewPanel.webview.html).toContain('Generate SSH Key');
+      expect(mockWebviewPanel.webview.html).toContain('Configure SSH Host');
+    });
+  });
+
+  describe('withDetailedProgress', () => {
+    it('should call vscode.window.withProgress with correct parameters', async () => {
+      // Mock withProgress
+      vi.mocked(vscode.window).withProgress = vi.fn().mockImplementation((options, task) => {
+        // Simulate calling the task with progress and token
+        const mockProgress = { report: vi.fn() };
+        const mockToken = { isCancellationRequested: false };
+        return task(mockProgress as any, mockToken as any);
+      });
+      
+      // Create a mock task that returns a value
+      const mockTask = vi.fn().mockImplementation((reporter, token) => {
+        reporter.nextStep();
+        reporter.reportStepProgress('Processing...', 50);
+        reporter.nextStep();
+        reporter.complete('All done!');
+        return Promise.resolve('task result');
+      });
+      
+      const result = await notificationService.withDetailedProgress(
+        'Multi-step Operation',
+        ['Step 1', 'Step 2', 'Step 3'],
+        mockTask
+      );
+      
+      // Verify withProgress was called with correct options
+      expect(vscode.window.withProgress).toHaveBeenCalledWith(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: 'Multi-step Operation',
+          cancellable: true
+        },
+        expect.any(Function)
+      );
+      
+      // Verify task was called
+      expect(mockTask).toHaveBeenCalled();
+      
+      // Verify result was passed through
+      expect(result).toBe('task result');
+    });
+  });
+
+  describe('DetailedProgressReporter', () => {
+    let reporter: DetailedProgressReporter;
+    let mockProgress: { report: vi.Mock };
+    
+    beforeEach(() => {
+      mockProgress = { report: vi.fn() };
+      reporter = new DetailedProgressReporter(
+        mockProgress as any,
+        ['Step 1', 'Step 2', 'Step 3']
+      );
+    });
+    
+    it('should initialize with the first step', () => {
+      expect(mockProgress.report).toHaveBeenCalledWith({
+        message: 'Step 1',
+        increment: 0
+      });
+    });
+    
+    it('should advance to the next step', () => {
+      const result = reporter.nextStep();
+      
+      expect(result).toBe(true);
+      expect(mockProgress.report).toHaveBeenCalledWith({
+        message: 'Step 2',
+        increment: expect.any(Number)
+      });
+    });
+    
+    it('should return false when trying to advance past the last step', () => {
+      reporter.nextStep(); // Step 2
+      reporter.nextStep(); // Step 3
+      const result = reporter.nextStep(); // Try to go beyond Step 3
+      
+      expect(result).toBe(false);
+    });
+    
+    it('should report progress within a step', () => {
+      reporter.reportStepProgress('Processing...', 50);
+      
+      expect(mockProgress.report).toHaveBeenCalledWith({
+        message: 'Processing...',
+        increment: expect.any(Number)
+      });
+    });
+    
+    it('should complete the progress reporting', () => {
+      reporter.complete('All done!');
+      
+      expect(mockProgress.report).toHaveBeenCalledWith({
+        message: 'All done!',
+        increment: expect.any(Number)
+      });
+    });
+  });
+
+  describe('dispose', () => {
+    it('should dispose of the status bar item', () => {
+      notificationService.dispose();
+      
+      // Get the status bar item created in the constructor
+      const statusBarItem = vi.mocked(vscode.window.createStatusBarItem).mock.results[0].value;
+      
+      expect(statusBarItem.dispose).toHaveBeenCalled();
+    });
+  });
+});
