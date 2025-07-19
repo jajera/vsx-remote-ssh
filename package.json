@@ -2,7 +2,7 @@
   "name": "vsx-remote-ssh",
   "displayName": "Remote SSH",
   "description": "Connect to and develop on remote servers via SSH",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "publisher": "jajera",
   "repository": {
     "type": "git",
@@ -165,7 +165,7 @@
     "lint": "eslint src --ext ts",
     "test": "vitest run",
     "test:watch": "vitest src",
-    "package": "npx @vscode/vsce package",
+    "package": "npx @vscode/vsce package --no-dependencies --allow-unused-files-patterns",
     "compile:watch": "tsc -watch -p ./",
     "extension:dev": "npm run compile && code --extensionDevelopmentPath=.",
     "extension:test": "npm run compile && code --extensionDevelopmentPath=. --disable-extensions",
@@ -190,8 +190,13 @@
   },
   "dependencies": {
     "@types/uuid": "^10.0.0",
-    "ssh2": "^1.11.0",
+    "ssh2": "^1.16.0",
     "ssh2-sftp-client": "^9.1.0",
     "uuid": "^11.1.0"
-  }
+  },
+  "bundleDependencies": [
+    "ssh2",
+    "ssh2-sftp-client",
+    "uuid"
+  ]
 }
