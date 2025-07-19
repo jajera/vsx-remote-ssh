@@ -37,6 +37,8 @@ export class CommandPaletteIntegration {
    * Register all command palette commands
    */
   registerCommands(): void {
+    console.log('DEBUG: CommandPaletteIntegration.registerCommands called');
+    
     // Main connection commands
     this.registerCommand('remote-ssh.connect', this.connectToHost.bind(this));
     this.registerCommand('remote-ssh.disconnect', this.disconnectCurrentHost.bind(this));
@@ -86,20 +88,25 @@ export class CommandPaletteIntegration {
     this.registerCommand('remote-ssh.showSettings', this.showSettings.bind(this));
     this.registerCommand('remote-ssh.exportConfiguration', this.exportConfiguration.bind(this));
     this.registerCommand('remote-ssh.importConfiguration', this.importConfiguration.bind(this));
+    
+    console.log('DEBUG: CommandPaletteIntegration.registerCommands completed');
   }
 
   /**
    * Helper method to register a command
    */
   private registerCommand(command: string, callback: (...args: any[]) => any): void {
+    console.log(`DEBUG: Registering command: ${command}`);
     const disposable = vscode.commands.registerCommand(command, callback);
     this.disposables.push(disposable);
+    console.log(`DEBUG: Command registered: ${command}`);
   }
 
   /**
    * Connect to an SSH host
    */
   private async connectToHost(): Promise<void> {
+    console.log('DEBUG: CommandPaletteIntegration.connectToHost called');
     await this.extensionBridge.showHostSelection();
   }
 
@@ -384,8 +391,26 @@ export class CommandPaletteIntegration {
    * Close all SSH terminals
    */
   private async closeTerminals(): Promise<void> {
-    // This would be implemented in the terminal provider
-    vscode.window.showInformationMessage('Closing all SSH terminals');
+    try {
+      // Get all active terminals and close SSH-related ones
+      const terminals = vscode.window.terminals.filter(terminal => 
+        terminal.name.startsWith('SSH:')
+      );
+      
+      if (terminals.length === 0) {
+        vscode.window.showInformationMessage('No SSH terminals to close');
+        return;
+      }
+      
+      // Close each SSH terminal
+      for (const terminal of terminals) {
+        terminal.dispose();
+      }
+      
+      vscode.window.showInformationMessage(`Closed ${terminals.length} SSH terminal(s)`);
+    } catch (error) {
+      vscode.window.showErrorMessage(`Failed to close terminals: ${error}`);
+    }
   }
 
   /**
@@ -857,8 +882,14 @@ export class CommandPaletteIntegration {
    * Clear the file cache
    */
   private async clearCache(): Promise<void> {
-    // This would be implemented in the file cache manager
-    vscode.window.showInformationMessage('Cache cleared successfully');
+    try {
+      // Access the file cache directly from the extension bridge
+      const fileCache = (this.extensionBridge as any).fileCache;
+      await fileCache.clearCache();
+      vscode.window.showInformationMessage('Cache cleared successfully');
+    } catch (error) {
+      vscode.window.showErrorMessage(`Failed to clear cache: ${error}`);
+    }
   }
 
   /**
@@ -1046,8 +1077,16 @@ Connection Information:
    */
   private async showCacheStatistics(): Promise<void> {
     try {
-      // For now, show a simple message since cache stats might not be available
-      vscode.window.showInformationMessage('Cache statistics feature is being implemented');
+      // Access the file cache directly from the extension bridge
+      const stats = (this.extensionBridge as any).fileCache.getStats();
+      const message = `Cache Statistics:
+- Total files: ${stats.totalFiles}
+- Total size: ${(stats.totalSize / 1024 / 1024).toFixed(2)} MB
+- Hit rate: ${(stats.hitRate * 100).toFixed(1)}%
+- Miss rate: ${(stats.missRate * 100).toFixed(1)}%
+- Evictions: ${stats.evictions}`;
+
+      vscode.window.showInformationMessage(message);
     } catch (error) {
       vscode.window.showErrorMessage(`Failed to get cache statistics: ${error}`);
     }

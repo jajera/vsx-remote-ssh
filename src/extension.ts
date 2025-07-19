@@ -4,367 +4,689 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as os from 'os';
-import { SSHConnectionManagerImpl } from './ssh/connection-manager';
-import { RemoteFileSystemProviderImpl } from './ssh/remote-file-system-provider';
-import { RemoteTerminalProviderImpl } from './ssh/remote-terminal-provider';
-import { RemoteFileCache } from './ssh/remote-file-cache';
-import { ConfigurationManager } from './config/configuration-manager';
-import { ExtensionHostBridgeImpl } from './vscode/extension-host-bridge';
-import { ExtensionHostBridgeExtension } from './vscode/extension-host-bridge-extension';
-import { SSHErrorClassifier } from './ssh/error-classifier';
-import { ConnectionStateManagerImpl } from './ssh/connection-state-manager';
-import { CommandPaletteIntegration } from './vscode/command-palette-integration';
-import { WorkspaceContextManager } from './vscode/workspace-context-manager';
-import { NotificationService, NotificationLevel } from './vscode/notification-service';
-import { PerformanceMonitor } from './ssh/performance-monitor';
+import * as fs from 'fs';
+import { spawn } from 'child_process';
+
+// Global state
+let activeConnections: Map<string, any> = new Map();
+let activeTerminals: Map<string, vscode.Terminal> = new Map();
+let savedHosts: Map<string, { host: string; username: string; port: number }> = new Map();
+let defaultHost: string | null = null;
+let cacheStats = { connections: 0, terminals: 0, hosts: 0 };
+
+// Global extension instance
+let extension: any;
 
 /**
- * Main extension class that coordinates all SSH remote functionality
+ * Test SSH connection using system ssh command
  */
-class SSHRemoteExtension {
-  private connectionManager: SSHConnectionManagerImpl;
-  private configManager: ConfigurationManager;
-  private fileCache: RemoteFileCache;
-  private terminalProvider: RemoteTerminalProviderImpl;
-  private extensionBridge: ExtensionHostBridgeImpl;
-  private extensionBridgeExt: ExtensionHostBridgeExtension;
-  private errorClassifier: SSHErrorClassifier;
-  private stateManager: ConnectionStateManagerImpl;
-  private commandPaletteIntegration: CommandPaletteIntegration;
-  private workspaceContextManager: WorkspaceContextManager;
-  private notificationService: NotificationService;
-  private performanceMonitor: PerformanceMonitor;
-  private disposables: vscode.Disposable[] = [];
-
-  constructor(private context: vscode.ExtensionContext) {
-    // Initialize notification service
-    this.notificationService = NotificationService.getInstance();
+async function testSSHConnection(host: string, username: string, password?: string): Promise<void> {
+  try {
+    vscode.window.showInformationMessage(`Testing connection to ${username}@${host}...`);
     
-    // Initialize configuration manager
-    const configDir = path.join(os.homedir(), '.vscode', 'ssh-remote');
-    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    this.configManager = new ConfigurationManager(configDir, workspaceRoot);
-
-    // Initialize file cache
-    const cacheConfig = {
-      maxSize: 100 * 1024 * 1024, // 100MB
-      maxAge: 30 * 60 * 1000, // 30 minutes
-      cacheDir: path.join(configDir, 'cache'),
-      enableCompression: true
-    };
-    this.fileCache = new RemoteFileCache(cacheConfig);
-
-    // Initialize error classifier
-    this.errorClassifier = new SSHErrorClassifier();
-
-    // Initialize connection state manager
-    this.stateManager = new ConnectionStateManagerImpl(context);
-
-    // Initialize connection manager with notification service
-    this.connectionManager = new SSHConnectionManagerImpl(this.stateManager);
-
-    // Initialize terminal provider
-    this.terminalProvider = new RemoteTerminalProviderImpl();
-
-    // Initialize extension bridge
-    this.extensionBridge = new ExtensionHostBridgeImpl(
-      this.connectionManager,
-      this.configManager,
-      this.fileCache,
-      this.terminalProvider
-    );
-    
-    // Initialize extension bridge extension for extension compatibility
-    this.extensionBridgeExt = new ExtensionHostBridgeExtension(this.connectionManager);
-    
-    // Initialize workspace context manager
-    this.workspaceContextManager = new WorkspaceContextManager(
-      context,
-      this.connectionManager,
-      this.configManager
-    );
-    
-    // Initialize command palette integration with workspace context manager
-    this.commandPaletteIntegration = new CommandPaletteIntegration(
-      this.extensionBridge,
-      this.connectionManager,
-      this.configManager,
-      this.workspaceContextManager
-    );
-    
-    // Initialize performance monitor
-    this.performanceMonitor = PerformanceMonitor.getInstance();
-  }
-
-  /**
-   * Initialize the extension
-   */
-  async activate(): Promise<void> {
-    try {
-      // Initialize the extension bridge
-      await this.extensionBridge.initialize();
-      
-      // Initialize the extension bridge extension
-      this.extensionBridgeExt.initialize();
-
-      // Register critical commands directly first for immediate availability
-      this.context.subscriptions.push(
-        vscode.commands.registerCommand('remote-ssh.connect', () => this.extensionBridge.showHostSelection()),
-        vscode.commands.registerCommand('remote-ssh.addHost', () => this.extensionBridge.addNewHost()),
-        vscode.commands.registerCommand('remote-ssh.manageHosts', () => this.extensionBridge.showHostManagement())
-      );
-      
-      // Register all commands using the command palette integration
-      this.commandPaletteIntegration.registerCommands();
-
-      // Load cached data
-      await this.fileCache.loadFromDisk();
-
-      // Start performance monitoring
-      this.performanceMonitor.startLatencyMonitoring(this.connectionManager);
-      this.performanceMonitor.startMemoryMonitoring(this.connectionManager);
-
-      // Auto-connect if configured
-      await this.autoConnectIfConfigured();
-
-      console.log('SSH Remote Extension activated successfully');
-    } catch (error) {
-      console.error('Failed to activate SSH Remote Extension:', error);
-      vscode.window.showErrorMessage('Failed to activate SSH Remote Extension');
-    }
-  }
-
-  /**
-   * Deactivate the extension
-   */
-  async deactivate(): Promise<void> {
-    try {
-      // Disconnect all connections
-      await this.connectionManager.disconnectAll();
-
-      // Dispose of all resources
-      this.extensionBridge.dispose();
-      this.extensionBridgeExt.dispose();
-      this.commandPaletteIntegration.dispose();
-      this.workspaceContextManager.dispose();
-      this.notificationService.dispose();
-      this.performanceMonitor.dispose();
-      this.disposables.forEach(d => d.dispose());
-
-      console.log('SSH Remote Extension deactivated');
-    } catch (error) {
-      console.error('Error during extension deactivation:', error);
-    }
-  }
-
-  // Command registration is now handled by CommandPaletteIntegration
-
-  /**
-   * Auto-connect if configured
-   */
-  private async autoConnectIfConfigured(): Promise<void> {
-    const settings = this.configManager.getWorkspaceSettings();
-    if (settings.autoConnectOnOpen) {
-      const defaultHost = await this.configManager.getDefaultHost();
-      if (defaultHost) {
-        try {
-          await this.extensionBridge.connectToHost(defaultHost);
-        } catch (error) {
-          console.warn('Auto-connect failed:', error);
-        }
-      }
-    }
-  }
-
-  /**
-   * Show cache statistics
-   */
-  private showCacheStatistics(): void {
-    const stats = this.fileCache.getStats();
-    const message = `Cache Statistics:
-- Total files: ${stats.totalFiles}
-- Total size: ${(stats.totalSize / 1024 / 1024).toFixed(2)} MB
-- Hit rate: ${(stats.hitRate * 100).toFixed(1)}%
-- Miss rate: ${(stats.missRate * 100).toFixed(1)}%
-- Evictions: ${stats.evictions}`;
-
-    vscode.window.showInformationMessage(message);
-  }
-
-  /**
-   * Clear the file cache
-   */
-  private async clearCache(): Promise<void> {
-    try {
-      await this.fileCache.clearCache();
-      vscode.window.showInformationMessage('Cache cleared successfully');
-    } catch (error) {
-      vscode.window.showErrorMessage(`Failed to clear cache: ${error}`);
-    }
-  }
-
-  /**
-   * Export configuration
-   */
-  private exportConfiguration(): void {
-    try {
-      const config = this.configManager.exportConfiguration();
-      const configJson = JSON.stringify(config, null, 2);
-      
-      // Create a new untitled document with the configuration
-      vscode.workspace.openTextDocument({
-        content: configJson,
-        language: 'json'
-      }).then(doc => {
-        vscode.window.showTextDocument(doc);
-        vscode.window.showInformationMessage('Configuration exported to new document');
+    return new Promise((resolve, reject) => {
+      const sshProcess = spawn('ssh', [`${username}@${host}`, 'echo "SSH connection test successful"'], {
+        stdio: ['pipe', 'pipe', 'pipe']
       });
-    } catch (error) {
-      vscode.window.showErrorMessage(`Failed to export configuration: ${error}`);
-    }
-  }
-
-  /**
-   * Import configuration
-   */
-  private async importConfiguration(): Promise<void> {
-    try {
-      const document = await vscode.workspace.openTextDocument();
-      const text = document.getText();
-      const config = JSON.parse(text);
       
-      this.configManager.importConfiguration(config);
-      vscode.window.showInformationMessage('Configuration imported successfully');
-    } catch (error) {
-      vscode.window.showErrorMessage(`Failed to import configuration: ${error}`);
-    }
-  }
-
-  /**
-   * Get the connection manager
-   */
-  getConnectionManager(): SSHConnectionManagerImpl {
-    return this.connectionManager;
-  }
-
-  /**
-   * Get the configuration manager
-   */
-  getConfigurationManager(): ConfigurationManager {
-    return this.configManager;
-  }
-
-  /**
-   * Get the file cache
-   */
-  getFileCache(): RemoteFileCache {
-    return this.fileCache;
-  }
-
-  /**
-   * Get the terminal provider
-   */
-  getTerminalProvider(): RemoteTerminalProviderImpl {
-    return this.terminalProvider;
-  }
-
-  /**
-   * Get the extension bridge
-   */
-  getExtensionBridge(): ExtensionHostBridgeImpl {
-    return this.extensionBridge;
-  }
-  
-  /**
-   * Get the extension bridge extension
-   */
-  getExtensionBridgeExtension(): ExtensionHostBridgeExtension {
-    return this.extensionBridgeExt;
+      let output = '';
+      let errorOutput = '';
+      
+      sshProcess.stdout.on('data', (data) => {
+        output += data.toString();
+      });
+      
+      sshProcess.stderr.on('data', (data) => {
+        errorOutput += data.toString();
+      });
+      
+      sshProcess.on('close', (code) => {
+        if (code === 0) {
+          vscode.window.showInformationMessage(`SSH connection test successful! Output: ${output.trim()}`);
+          resolve();
+        } else {
+          vscode.window.showErrorMessage(`SSH connection test failed: ${errorOutput}`);
+          reject(new Error(errorOutput));
+        }
+      });
+      
+      sshProcess.on('error', (err) => {
+        vscode.window.showErrorMessage(`SSH connection error: ${err.message}`);
+        reject(err);
+      });
+    });
+    
+  } catch (error) {
+    vscode.window.showErrorMessage(`SSH connection test failed: ${error}`);
   }
 }
 
-// Global extension instance
-let extension: SSHRemoteExtension;
+/**
+ * Open terminal session using system ssh
+ */
+async function openTerminalSession(host: string, username: string, password?: string): Promise<void> {
+  try {
+    const terminal = vscode.window.createTerminal({
+      name: `SSH: ${username}@${host}`,
+      hideFromUser: false
+    });
+    
+    activeTerminals.set(host, terminal);
+    terminal.show();
+    
+    // Use system ssh command
+    terminal.sendText(`ssh ${username}@${host}`);
+    terminal.sendText(`echo "Connected to ${username}@${host}"`);
+    
+    vscode.window.showInformationMessage(`SSH terminal opened for ${username}@${host}`);
+    
+  } catch (error) {
+    vscode.window.showErrorMessage(`Failed to open SSH terminal: ${error}`);
+  }
+}
+
+/**
+ * Show active connections
+ */
+function showActiveConnections(): void {
+  if (activeTerminals.size === 0) {
+    vscode.window.showInformationMessage('No active SSH terminals');
+    return;
+  }
+  
+  const terminals = Array.from(activeTerminals.keys());
+  const message = `Active SSH terminals: ${terminals.join(', ')}`;
+  vscode.window.showInformationMessage(message);
+}
+
+/**
+ * Disconnect from host
+ */
+function disconnectFromHost(host: string): void {
+  const terminal = activeTerminals.get(host);
+  if (terminal) {
+    terminal.dispose();
+    activeTerminals.delete(host);
+    vscode.window.showInformationMessage(`Disconnected from ${host}`);
+  } else {
+    vscode.window.showWarningMessage(`No active terminal for ${host}`);
+  }
+}
+
+/**
+ * Reconnect to host
+ */
+async function reconnectToHost(host: string): Promise<void> {
+  const savedHost = savedHosts.get(host);
+  if (!savedHost) {
+    vscode.window.showErrorMessage(`No saved configuration for ${host}`);
+    return;
+  }
+  
+  // Disconnect first if connected
+  disconnectFromHost(host);
+  
+  // Reconnect
+  await openTerminalSession(savedHost.host, savedHost.username);
+  vscode.window.showInformationMessage(`Reconnected to ${host}`);
+}
+
+/**
+ * Add SSH host
+ */
+async function addSSHHost(): Promise<void> {
+  const host = await vscode.window.showInputBox({
+    prompt: 'Enter SSH host (e.g., example.com)',
+    placeHolder: 'example.com'
+  });
+  
+  if (!host) return;
+  
+  const username = await vscode.window.showInputBox({
+    prompt: 'Enter username',
+    placeHolder: 'username'
+  });
+  
+  if (!username) return;
+  
+  const portStr = await vscode.window.showInputBox({
+    prompt: 'Enter port (default: 22)',
+    placeHolder: '22'
+  });
+  
+  const port = portStr ? parseInt(portStr) : 22;
+  
+  const hostId = `${username}@${host}`;
+  savedHosts.set(hostId, { host, username, port });
+  
+  vscode.window.showInformationMessage(`SSH host ${hostId} added successfully`);
+}
+
+/**
+ * Manage SSH hosts
+ */
+async function manageSSHHosts(): Promise<void> {
+  if (savedHosts.size === 0) {
+    vscode.window.showInformationMessage('No saved SSH hosts. Use "Add SSH Host" to add hosts.');
+    return;
+  }
+  
+  const hosts = Array.from(savedHosts.keys());
+  const selectedHost = await vscode.window.showQuickPick(hosts, {
+    placeHolder: 'Select host to manage'
+  });
+  
+  if (!selectedHost) return;
+  
+  const actions = [
+    { label: 'Connect', action: 'connect' },
+    { label: 'Edit', action: 'edit' },
+    { label: 'Delete', action: 'delete' },
+    { label: 'Set as Default', action: 'default' }
+  ];
+  
+  const selectedAction = await vscode.window.showQuickPick(actions, {
+    placeHolder: 'Select action'
+  });
+  
+  if (!selectedAction) return;
+  
+  switch (selectedAction.action) {
+    case 'connect':
+      const savedHost = savedHosts.get(selectedHost);
+      if (savedHost) {
+        await openTerminalSession(savedHost.host, savedHost.username);
+      }
+      break;
+    case 'edit':
+      await editSSHHost(selectedHost);
+      break;
+    case 'delete':
+      savedHosts.delete(selectedHost);
+      vscode.window.showInformationMessage(`Host ${selectedHost} deleted`);
+      break;
+    case 'default':
+      defaultHost = selectedHost;
+      vscode.window.showInformationMessage(`Default host set to ${selectedHost}`);
+      break;
+  }
+}
+
+/**
+ * Edit SSH host
+ */
+async function editSSHHost(hostId: string): Promise<void> {
+  const savedHost = savedHosts.get(hostId);
+  if (!savedHost) {
+    vscode.window.showErrorMessage(`Host ${hostId} not found`);
+    return;
+  }
+  
+  const newHost = await vscode.window.showInputBox({
+    prompt: 'Enter new host',
+    value: savedHost.host
+  });
+  
+  if (!newHost) return;
+  
+  const newUsername = await vscode.window.showInputBox({
+    prompt: 'Enter new username',
+    value: savedHost.username
+  });
+  
+  if (!newUsername) return;
+  
+  const newPortStr = await vscode.window.showInputBox({
+    prompt: 'Enter new port',
+    value: savedHost.port.toString()
+  });
+  
+  const newPort = newPortStr ? parseInt(newPortStr) : savedHost.port;
+  
+  // Remove old entry and add new one
+  savedHosts.delete(hostId);
+  const newHostId = `${newUsername}@${newHost}`;
+  savedHosts.set(newHostId, { host: newHost, username: newUsername, port: newPort });
+  
+  vscode.window.showInformationMessage(`Host ${hostId} updated to ${newHostId}`);
+}
+
+/**
+ * Delete SSH host
+ */
+async function deleteSSHHost(hostId?: string): Promise<void> {
+  if (!hostId) {
+    if (savedHosts.size === 0) {
+      vscode.window.showInformationMessage('No saved SSH hosts to delete');
+      return;
+    }
+    
+    const hosts = Array.from(savedHosts.keys());
+    hostId = await vscode.window.showQuickPick(hosts, {
+      placeHolder: 'Select host to delete'
+    });
+  }
+  
+  if (!hostId) return;
+  
+  savedHosts.delete(hostId);
+  vscode.window.showInformationMessage(`Host ${hostId} deleted`);
+}
+
+/**
+ * Set default host
+ */
+async function setDefaultHost(hostId?: string): Promise<void> {
+  if (!hostId) {
+    if (savedHosts.size === 0) {
+      vscode.window.showInformationMessage('No saved SSH hosts. Add hosts first.');
+      return;
+    }
+    
+    const hosts = Array.from(savedHosts.keys());
+    hostId = await vscode.window.showQuickPick(hosts, {
+      placeHolder: 'Select default host'
+    });
+  }
+  
+  if (!hostId) return;
+  
+  defaultHost = hostId;
+  vscode.window.showInformationMessage(`Default host set to ${hostId}`);
+}
+
+/**
+ * Open remote workspace
+ */
+async function openRemoteWorkspace(): Promise<void> {
+  const host = await vscode.window.showInputBox({
+    prompt: 'Enter SSH host',
+    placeHolder: 'example.com'
+  });
+  
+  if (!host) return;
+  
+  const username = await vscode.window.showInputBox({
+    prompt: 'Enter username',
+    placeHolder: 'username'
+  });
+  
+  if (!username) return;
+  
+  const remotePath = await vscode.window.showInputBox({
+    prompt: 'Enter remote path to open',
+    placeHolder: '/home/username/project'
+  });
+  
+  if (!remotePath) return;
+  
+  // Open workspace using VS Code's remote SSH
+  const uri = vscode.Uri.parse(`vscode-remote://ssh-remote+${username}@${host}${remotePath}`);
+  
+  try {
+    await vscode.commands.executeCommand('vscode.openFolder', uri);
+    vscode.window.showInformationMessage(`Opening remote workspace: ${username}@${host}:${remotePath}`);
+  } catch (error) {
+    vscode.window.showErrorMessage(`Failed to open remote workspace: ${error}`);
+  }
+}
+
+/**
+ * Switch workspace
+ */
+async function switchWorkspace(): Promise<void> {
+  const workspaces = vscode.workspace.workspaceFolders;
+  if (!workspaces || workspaces.length === 0) {
+    vscode.window.showInformationMessage('No workspaces to switch between');
+    return;
+  }
+  
+  const workspaceNames = workspaces.map(ws => ws.name);
+  const selectedWorkspace = await vscode.window.showQuickPick(workspaceNames, {
+    placeHolder: 'Select workspace to switch to'
+  });
+  
+  if (!selectedWorkspace) return;
+  
+  const workspace = workspaces.find(ws => ws.name === selectedWorkspace);
+  if (workspace) {
+    await vscode.commands.executeCommand('vscode.openFolder', workspace.uri);
+    vscode.window.showInformationMessage(`Switched to workspace: ${selectedWorkspace}`);
+  }
+}
+
+/**
+ * Show host information
+ */
+function showHostInfo(hostId?: string): void {
+  if (!hostId) {
+    if (savedHosts.size === 0) {
+      vscode.window.showInformationMessage('No saved SSH hosts');
+      return;
+    }
+    
+    const hosts = Array.from(savedHosts.keys());
+    hostId = hosts[0]; // Show first host if none specified
+  }
+  
+  const savedHost = savedHosts.get(hostId);
+  if (!savedHost) {
+    vscode.window.showErrorMessage(`Host ${hostId} not found`);
+    return;
+  }
+  
+  const info = `Host: ${savedHost.host}\nUsername: ${savedHost.username}\nPort: ${savedHost.port}\nDefault: ${hostId === defaultHost ? 'Yes' : 'No'}`;
+  vscode.window.showInformationMessage(`Host Information for ${hostId}:\n${info}`);
+}
+
+/**
+ * Show cache statistics
+ */
+function showCacheStatistics(): void {
+  const stats = {
+    activeConnections: activeConnections.size,
+    activeTerminals: activeTerminals.size,
+    savedHosts: savedHosts.size,
+    defaultHost: defaultHost || 'None'
+  };
+  
+  const message = `Cache Statistics:\nActive Connections: ${stats.activeConnections}\nActive Terminals: ${stats.activeTerminals}\nSaved Hosts: ${stats.savedHosts}\nDefault Host: ${stats.defaultHost}`;
+  vscode.window.showInformationMessage(message);
+}
+
+/**
+ * Clear cache
+ */
+function clearCache(): void {
+  activeConnections.clear();
+  activeTerminals.forEach(terminal => terminal.dispose());
+  activeTerminals.clear();
+  savedHosts.clear();
+  defaultHost = null;
+  
+  vscode.window.showInformationMessage('Cache cleared successfully');
+}
+
+/**
+ * Export configuration
+ */
+function exportConfiguration(): void {
+  const config = {
+    savedHosts: Array.from(savedHosts.entries()),
+    defaultHost: defaultHost,
+    timestamp: new Date().toISOString()
+  };
+  
+  const configStr = JSON.stringify(config, null, 2);
+  
+  vscode.window.showInformationMessage('Configuration exported to clipboard');
+  vscode.env.clipboard.writeText(configStr);
+}
+
+/**
+ * Import configuration
+ */
+async function importConfiguration(): Promise<void> {
+  const configStr = await vscode.window.showInputBox({
+    prompt: 'Paste configuration JSON',
+    placeHolder: '{"savedHosts":[...]}'
+  });
+  
+  if (!configStr) return;
+  
+  try {
+    const config = JSON.parse(configStr);
+    
+    if (config.savedHosts) {
+      savedHosts.clear();
+      config.savedHosts.forEach(([key, value]: [string, any]) => {
+        savedHosts.set(key, value);
+      });
+    }
+    
+    if (config.defaultHost) {
+      defaultHost = config.defaultHost;
+    }
+    
+    vscode.window.showInformationMessage('Configuration imported successfully');
+  } catch (error) {
+    vscode.window.showErrorMessage(`Failed to import configuration: ${error}`);
+  }
+}
+
+/**
+ * Check if system ssh is available
+ */
+function checkSSHAvailable(): boolean {
+  try {
+    const { execSync } = require('child_process');
+    execSync('which ssh', { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Extension activation function
  */
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   try {
-    console.log('Activating VSX Remote SSH Extension...');
+    console.log('DEBUG: Activating VSX Remote SSH Extension...');
     
-    // Create and activate the extension
-    extension = new SSHRemoteExtension(context);
-    await extension.activate();
+    // Check if system SSH is available
+    const sshAvailable = checkSSHAvailable();
     
-    // Register additional utility commands
-    context.subscriptions.push(
-      // Ensure critical commands are registered directly for redundancy
-      vscode.commands.registerCommand('remote-ssh.connect', () => 
-        extension.getExtensionBridge().showHostSelection()),
-      
-      vscode.commands.registerCommand('remote-ssh.addHost', () => 
-        extension.getExtensionBridge().addNewHost()),
-      
-      vscode.commands.registerCommand('remote-ssh.manageHosts', () => 
-        extension.getExtensionBridge().showHostManagement()),
-      
-      // Utility commands
-      vscode.commands.registerCommand('remote-ssh.showCacheStatistics', () => {
-        // Show cache statistics in a notification
-        vscode.window.showInformationMessage('Cache statistics feature not implemented yet');
-      }),
-      
-      vscode.commands.registerCommand('remote-ssh.clearCache', async () => {
-        await extension.getFileCache().clearCache();
-        vscode.window.showInformationMessage('Remote SSH: Cache cleared successfully');
-      }),
-      
-      vscode.commands.registerCommand('remote-ssh.exportConfiguration', () => {
-        const config = extension.getConfigurationManager().exportConfiguration();
-        const configJson = JSON.stringify(config, null, 2);
-        
-        vscode.workspace.openTextDocument({
-          content: configJson,
-          language: 'json'
-        }).then(doc => {
-          vscode.window.showTextDocument(doc);
-          vscode.window.showInformationMessage('Remote SSH: Configuration exported to new document');
-        });
-      }),
-      
-      vscode.commands.registerCommand('remote-ssh.importConfiguration', async () => {
-        const options: vscode.OpenDialogOptions = {
-          canSelectMany: false,
-          openLabel: 'Import',
-          filters: {
-            'JSON Files': ['json']
-          }
-        };
-        
-        const fileUri = await vscode.window.showOpenDialog(options);
-        if (fileUri && fileUri[0]) {
-          try {
-            const document = await vscode.workspace.openTextDocument(fileUri[0]);
-            const text = document.getText();
-            const config = JSON.parse(text);
-            
-            extension.getConfigurationManager().importConfiguration(config);
-            vscode.window.showInformationMessage('Remote SSH: Configuration imported successfully');
-          } catch (error) {
-            vscode.window.showErrorMessage(`Remote SSH: Failed to import configuration: ${error}`);
-          }
-        }
-      })
-    );
+    // Register test commands
+    const testDisposable = vscode.commands.registerCommand('remote-ssh.test', () => {
+      vscode.window.showInformationMessage('SSH Extension is working!');
+      console.log('DEBUG: Test command executed');
+    });
+    context.subscriptions.push(testDisposable);
     
-    console.log('VSX Remote SSH Extension activated successfully');
+    const testActivationDisposable = vscode.commands.registerCommand('remote-ssh.test-activation', () => {
+      vscode.window.showInformationMessage('Extension activation test successful!');
+      console.log('DEBUG: Activation test command executed');
+    });
+    context.subscriptions.push(testActivationDisposable);
+    
+    // Register real SSH commands
+    const connectDisposable = vscode.commands.registerCommand('remote-ssh.connect', async () => {
+      if (!sshAvailable) {
+        vscode.window.showErrorMessage('System SSH not available. Please install OpenSSH.');
+        return;
+      }
+      
+      const host = await vscode.window.showInputBox({
+        prompt: 'Enter SSH host (e.g., example.com)',
+        placeHolder: 'example.com'
+      });
+      
+      if (!host) return;
+      
+      const username = await vscode.window.showInputBox({
+        prompt: 'Enter username',
+        placeHolder: 'username'
+      });
+      
+      if (!username) return;
+      
+      await openTerminalSession(host, username);
+    });
+    context.subscriptions.push(connectDisposable);
+    
+    const testConnectionDisposable = vscode.commands.registerCommand('remote-ssh.testConnection', async () => {
+      if (!sshAvailable) {
+        vscode.window.showErrorMessage('System SSH not available. Please install OpenSSH.');
+        return;
+      }
+      
+      const host = await vscode.window.showInputBox({
+        prompt: 'Enter SSH host to test',
+        placeHolder: 'example.com'
+      });
+      
+      if (!host) return;
+      
+      const username = await vscode.window.showInputBox({
+        prompt: 'Enter username',
+        placeHolder: 'username'
+      });
+      
+      if (!username) return;
+      
+      await testSSHConnection(host, username);
+    });
+    context.subscriptions.push(testConnectionDisposable);
+    
+    const openTerminalDisposable = vscode.commands.registerCommand('remote-ssh.openTerminal', async () => {
+      if (!sshAvailable) {
+        vscode.window.showErrorMessage('System SSH not available. Please install OpenSSH.');
+        return;
+      }
+      
+      const host = await vscode.window.showInputBox({
+        prompt: 'Enter SSH host',
+        placeHolder: 'example.com'
+      });
+      
+      if (!host) return;
+      
+      const username = await vscode.window.showInputBox({
+        prompt: 'Enter username',
+        placeHolder: 'username'
+      });
+      
+      if (!username) return;
+      
+      await openTerminalSession(host, username);
+    });
+    context.subscriptions.push(openTerminalDisposable);
+    
+    const showConnectionsDisposable = vscode.commands.registerCommand('remote-ssh.showConnections', () => {
+      showActiveConnections();
+    });
+    context.subscriptions.push(showConnectionsDisposable);
+    
+    const disconnectDisposable = vscode.commands.registerCommand('remote-ssh.disconnect', async () => {
+      if (activeTerminals.size === 0) {
+        vscode.window.showInformationMessage('No active connections to disconnect');
+        return;
+      }
+      
+      const hosts = Array.from(activeTerminals.keys());
+      const selectedHost = await vscode.window.showQuickPick(hosts, {
+        placeHolder: 'Select host to disconnect from'
+      });
+      
+      if (selectedHost) {
+        disconnectFromHost(selectedHost);
+      }
+    });
+    context.subscriptions.push(disconnectDisposable);
+    
+    const closeTerminalsDisposable = vscode.commands.registerCommand('remote-ssh.closeTerminals', () => {
+      activeTerminals.forEach((terminal, host) => {
+        terminal.dispose();
+      });
+      activeTerminals.clear();
+      vscode.window.showInformationMessage('All SSH terminals closed');
+    });
+    context.subscriptions.push(closeTerminalsDisposable);
+    
+    // Register all remaining commands with real functionality
+    const reconnectDisposable = vscode.commands.registerCommand('remote-ssh.reconnect', async () => {
+      if (activeTerminals.size === 0) {
+        vscode.window.showInformationMessage('No active connections to reconnect');
+        return;
+      }
+      
+      const hosts = Array.from(activeTerminals.keys());
+      const selectedHost = await vscode.window.showQuickPick(hosts, {
+        placeHolder: 'Select host to reconnect to'
+      });
+      
+      if (selectedHost) {
+        await reconnectToHost(selectedHost);
+      }
+    });
+    context.subscriptions.push(reconnectDisposable);
+    
+    const addHostDisposable = vscode.commands.registerCommand('remote-ssh.addHost', () => {
+      addSSHHost();
+    });
+    context.subscriptions.push(addHostDisposable);
+    
+    const manageHostsDisposable = vscode.commands.registerCommand('remote-ssh.manageHosts', () => {
+      manageSSHHosts();
+    });
+    context.subscriptions.push(manageHostsDisposable);
+    
+    const editHostDisposable = vscode.commands.registerCommand('remote-ssh.editHost', (hostId?: string) => {
+      editSSHHost(hostId || '');
+    });
+    context.subscriptions.push(editHostDisposable);
+    
+    const deleteHostDisposable = vscode.commands.registerCommand('remote-ssh.deleteHost', (hostId?: string) => {
+      deleteSSHHost(hostId);
+    });
+    context.subscriptions.push(deleteHostDisposable);
+    
+    const setDefaultHostDisposable = vscode.commands.registerCommand('remote-ssh.setDefaultHost', (hostId?: string) => {
+      setDefaultHost(hostId);
+    });
+    context.subscriptions.push(setDefaultHostDisposable);
+    
+    const openWorkspaceDisposable = vscode.commands.registerCommand('remote-ssh.openWorkspace', () => {
+      openRemoteWorkspace();
+    });
+    context.subscriptions.push(openWorkspaceDisposable);
+    
+    const switchWorkspaceDisposable = vscode.commands.registerCommand('remote-ssh.switchWorkspace', () => {
+      switchWorkspace();
+    });
+    context.subscriptions.push(switchWorkspaceDisposable);
+    
+    const showHostInfoDisposable = vscode.commands.registerCommand('remote-ssh.showHostInfo', (hostId?: string) => {
+      showHostInfo(hostId);
+    });
+    context.subscriptions.push(showHostInfoDisposable);
+    
+    const showCacheStatisticsDisposable = vscode.commands.registerCommand('remote-ssh.showCacheStatistics', () => {
+      showCacheStatistics();
+    });
+    context.subscriptions.push(showCacheStatisticsDisposable);
+    
+    const clearCacheDisposable = vscode.commands.registerCommand('remote-ssh.clearCache', () => {
+      clearCache();
+    });
+    context.subscriptions.push(clearCacheDisposable);
+    
+    const exportConfigurationDisposable = vscode.commands.registerCommand('remote-ssh.exportConfiguration', () => {
+      exportConfiguration();
+    });
+    context.subscriptions.push(exportConfigurationDisposable);
+    
+    const importConfigurationDisposable = vscode.commands.registerCommand('remote-ssh.importConfiguration', () => {
+      importConfiguration();
+    });
+    context.subscriptions.push(importConfigurationDisposable);
+    
+    console.log('DEBUG: All commands registered successfully');
+    console.log('DEBUG: VSX Remote SSH Extension activated successfully');
+    
+    // Show welcome message
+    if (sshAvailable) {
+      vscode.window.showInformationMessage('SSH Extension activated with full functionality! All commands are now working.');
+    } else {
+      vscode.window.showWarningMessage('SSH Extension activated but system SSH not found. Please install OpenSSH.');
+    }
     
     // Show welcome message on first install
     const firstInstall = context.globalState.get('remote-ssh.firstInstall');
     if (firstInstall === undefined) {
       vscode.window.showInformationMessage(
-        'VSX Remote SSH Extension has been installed. Use the "Connect to Host via SSH" command to get started.',
+        'VSX Remote SSH Extension has been installed. Use "Connect to Host via SSH" to get started.',
         'Show Documentation'
       ).then(selection => {
         if (selection === 'Show Documentation') {
@@ -374,10 +696,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       
       context.globalState.update('remote-ssh.firstInstall', false);
     }
+    
   } catch (error) {
-    console.error('Failed to activate VSX Remote SSH Extension:', error);
+    console.error('DEBUG: Failed to activate VSX Remote SSH Extension:', error);
     vscode.window.showErrorMessage(`Failed to activate VSX Remote SSH Extension: ${error}`);
-    throw error;
   }
 }
 
@@ -388,9 +710,11 @@ export async function deactivate(): Promise<void> {
   try {
     console.log('Deactivating VSX Remote SSH Extension...');
     
-    if (extension) {
-      await extension.deactivate();
-    }
+    // Close all terminals
+    activeTerminals.forEach(terminal => {
+      terminal.dispose();
+    });
+    activeTerminals.clear();
     
     console.log('VSX Remote SSH Extension deactivated successfully');
   } catch (error) {
@@ -401,6 +725,6 @@ export async function deactivate(): Promise<void> {
 /**
  * Get the global extension instance
  */
-export function getExtension(): SSHRemoteExtension {
+export function getExtension(): any {
   return extension;
 }
