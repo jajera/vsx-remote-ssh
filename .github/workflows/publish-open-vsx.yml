@@ -68,28 +68,23 @@ jobs:
           # Install ovsx CLI
           npm install -g ovsx
           
-          # Check if namespace exists using Open VSX search API
-          SEARCH_RESULT=$(curl -s "https://open-vsx.org/api/-/search?query=${{ github.repository_owner }}" | jq -r '.totalSize // 0')
+          # Try to create namespace - if it fails with "already exists", then it exists
+          echo "Attempting to create namespace '${{ github.repository_owner }}'..."
+          CREATE_OUTPUT=$(ovsx create-namespace ${{ github.repository_owner }} 2>&1)
+          CREATE_EXIT_CODE=$?
           
-          if [ "$SEARCH_RESULT" -gt 0 ]; then
+          if [ $CREATE_EXIT_CODE -eq 0 ]; then
+            echo "✅ Namespace '${{ github.repository_owner }}' created successfully!"
+            echo "NAMESPACE_EXISTS=true" >> $GITHUB_OUTPUT
+          elif echo "$CREATE_OUTPUT" | grep -q "already exists"; then
             echo "✅ Namespace '${{ github.repository_owner }}' already exists in Open VSX Registry"
             echo "NAMESPACE_EXISTS=true" >> $GITHUB_OUTPUT
           else
-            echo "❌ Namespace '${{ github.repository_owner }}' does not exist in Open VSX Registry"
-            echo "Creating namespace now..."
-            
-            # Create namespace using GitHub username
-            ovsx create-namespace ${{ github.repository_owner }}
-            
-            if [ $? -eq 0 ]; then
-              echo "✅ Namespace '${{ github.repository_owner }}' created successfully!"
-              echo "NAMESPACE_EXISTS=true" >> $GITHUB_OUTPUT
-            else
-              echo "❌ Failed to create namespace '${{ github.repository_owner }}'"
-              echo "Check your OVSX_PAT token and permissions"
-              echo "NAMESPACE_EXISTS=false" >> $GITHUB_OUTPUT
-              exit 1
-            fi
+            echo "❌ Failed to create namespace '${{ github.repository_owner }}'"
+            echo "Error: $CREATE_OUTPUT"
+            echo "Check your OVSX_PAT token and permissions"
+            echo "NAMESPACE_EXISTS=false" >> $GITHUB_OUTPUT
+            exit 1
           fi
         env:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
