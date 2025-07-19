@@ -38,4 +38,8 @@
 - [x] 8. Update documentation
   - Update any documentation that references the module system
   - Document the changes made to fix the module system incompatibility
-  - _Requirements: 2.1, 3.1, 3.2_
+  - _Requirements: 2.1, 3.1, 3.2_- 
+[ ] 9. Install dependencies
+  - Install required npm dependencies
+  - Ensure dependencies are properly bundled with the extension
+  - _Requirements: 1.1, 1.2, 1.4, 3.2_
