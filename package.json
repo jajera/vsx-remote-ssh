@@ -165,7 +165,7 @@
     "lint": "eslint src --ext ts",
     "test": "vitest run",
     "test:watch": "vitest src",
-    "package": "npx @vscode/vsce package --no-dependencies --allow-unused-files-patterns",
+    "package": "npx @vscode/vsce package --no-dependencies",
     "compile:watch": "tsc -watch -p ./",
     "extension:dev": "npm run compile && code --extensionDevelopmentPath=.",
     "extension:test": "npm run compile && code --extensionDevelopmentPath=. --disable-extensions",
