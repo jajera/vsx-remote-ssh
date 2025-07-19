@@ -1,124 +1,130 @@
-name: CI/CD - Open VSX Registry
+name: Release to Open VSX Registry
 
 on:
+  workflow_dispatch:
   push:
-    branches: [main]
-  pull_request:
     branches: [main]
 
 jobs:
-  test-and-publish:
+  release:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        token: ${{ secrets.GITHUB_TOKEN }}
-      
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: "20"
-        cache: "npm"
-        
-    - name: Install dependencies
-      run: npm ci
-      
-    - name: Run linting
-      run: npm run lint
-      
-    - name: Run tests
-      run: npm test
-      
-    - name: Security audit
-      run: npm audit --audit-level=moderate
-      
-    - name: Build extension
-      run: npm run compile
-      
-    - name: Package extension
-      run: npm run package
-      
-    - name: Auto Version Increment
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-      id: version
-      run: |
-        # Get current version from package.json
-        CURRENT_VERSION=$(node -p "require('./package.json').version")
-        echo "Current version: $CURRENT_VERSION"
-        
-        # Check if this version was already published
-        if git tag | grep -q "v$CURRENT_VERSION"; then
-          echo "Version $CURRENT_VERSION already exists, incrementing..."
-          
-          # Parse version components
-          IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
-          MAJOR=${VERSION_PARTS[0]}
-          MINOR=${VERSION_PARTS[1]}
-          PATCH=${VERSION_PARTS[2]}
-          
-          # Increment patch version
-          NEW_PATCH=$((PATCH + 1))
-          NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
-          
-          echo "Incrementing version from $CURRENT_VERSION to $NEW_VERSION"
-          
-          # Update package.json
-          node -e "
-            const fs = require('fs');
-            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-            pkg.version = '$NEW_VERSION';
-            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
-          "
-          
-          # Create git tag
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add package.json
-          git commit -m "Auto-increment version to $NEW_VERSION [skip ci]"
-          git tag "v$NEW_VERSION"
-          git push origin main
-          git push origin "v$NEW_VERSION"
-          
-          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "VERSION_CHANGED=true" >> $GITHUB_OUTPUT
-        else
-          echo "Version $CURRENT_VERSION is new, using as-is"
-          echo "NEW_VERSION=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-          echo "VERSION_CHANGED=false" >> $GITHUB_OUTPUT
-        fi
-      
-    - name: Package extension with new version
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-      run: npm run package
-      
-    - name: Publish to Open VSX Registry
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-      run: npx @vscode/vsce publish -p ${{ secrets.OVSX_PAT }}
-      env:
-        OVSX_PAT: ${{ secrets.OVSX_PAT }}
-        
-    - name: Create Release
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-      uses: softprops/action-gh-release@v2
-      with:
-        tag_name: v${{ steps.version.outputs.NEW_VERSION }}
-        name: Release ${{ steps.version.outputs.NEW_VERSION }}
-        files: |
-          *.vsix
-        generate_release_notes: true
-        draft: false
-        prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: extension-build
-        path: |
-          *.vsix
-          out/
-        retention-days: 30
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linting
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test
+
+      - name: Security audit
+        run: npm audit --audit-level=moderate
+
+      - name: Build extension
+        run: npm run compile
+
+      - name: Package extension
+        id: package_vsix
+        run: |
+          npm run package
+          echo "vsix_path=$(ls *.vsix)" >> $GITHUB_OUTPUT
+          echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Check for new version
+        id: version_check
+        run: |
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          echo "Current version: $CURRENT_VERSION"
+
+          # Check if this version was already released
+          if git tag | grep -q "v$CURRENT_VERSION"; then
+            echo "Version $CURRENT_VERSION already released, skipping"
+            echo "SHOULD_RELEASE=false" >> $GITHUB_OUTPUT
+          else
+            echo "New version $CURRENT_VERSION detected, will create release"
+            echo "SHOULD_RELEASE=true" >> $GITHUB_OUTPUT
+            echo "NEW_VERSION=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Verify Publisher and Extension Info
+        if: steps.version_check.outputs.SHOULD_RELEASE == 'true'
+        run: |
+          echo "📋 Extension Information:"
+          echo "Name: $(node -p "require('./package.json').name")"
+          echo "Publisher: $(node -p "require('./package.json').publisher")"
+          echo "Version: $(node -p "require('./package.json').version")"
+          echo "Display Name: $(node -p "require('./package.json').displayName")"
+          echo ""
+          echo "⚠️  IMPORTANT: Make sure your Open VSX Registry account matches the publisher name!"
+          echo "Current publisher: vsx-remote-ssh"
+          echo "If this doesn't match your Open VSX account, update package.json publisher field."
+
+      - name: Publish to Open VSX Registry
+        if: steps.version_check.outputs.SHOULD_RELEASE == 'true'
+        run: |
+          if [ -z "$OVSX_PAT" ]; then
+            echo "❌ OVSX_PAT secret not set. Skipping Open VSX Registry publish."
+            echo "To enable publishing, add OVSX_PAT to repository secrets."
+            echo "Get your token from: https://open-vsx.org/user-settings/tokens"
+            exit 0
+          fi
+
+          echo "📦 Publishing version ${{ steps.version_check.outputs.NEW_VERSION }} to Open VSX Registry..."
+          echo "Publisher: vsx-remote-ssh"
+          echo "Extension: vsx-remote-ssh"
+          echo "Registry: https://open-vsx.org"
+
+          # Publish to Open VSX Registry using ovsx CLI
+          npx ovsx publish --packagePath ${{ steps.package_vsix.outputs.vsix_path }}
+
+          if [ $? -eq 0 ]; then
+            echo "✅ Successfully published to Open VSX Registry!"
+            echo "🔗 View your extension at: https://open-vsx.org/extension/vsx-remote-ssh/vsx-remote-ssh"
+          else
+            echo "❌ Failed to publish to Open VSX Registry"
+            echo ""
+            echo "🔧 Troubleshooting steps:"
+            echo "1. Check your OVSX_PAT token at: https://open-vsx.org/user-settings/tokens"
+            echo "2. Verify your Open VSX account matches publisher: vsx-remote-ssh"
+            echo "3. Make sure the token has publish permissions"
+            echo "4. Check if the extension name is already taken"
+            exit 1
+          fi
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+
+      - name: Create GitHub Release
+        if: steps.version_check.outputs.SHOULD_RELEASE == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version_check.outputs.NEW_VERSION }}
+          name: Release ${{ steps.version_check.outputs.NEW_VERSION }}
+          files: ${{ steps.package_vsix.outputs.vsix_path }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-build
+          path: |
+            *.vsix
+            out/
+          retention-days: 30
