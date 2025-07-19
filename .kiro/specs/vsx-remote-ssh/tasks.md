@@ -217,3 +217,28 @@
   - Ensure all assets are properly organized in the resources directory
   - Remove any other unnecessary files that aren't dependencies
   - _Requirements: 9.1, 9.2_
+
+- [x] 12. Implement cross-platform SSH detection
+- [x] 12.1 Fix Windows SSH detection
+  - Replace Unix-specific `which ssh` command with platform-aware detection
+  - Add Windows-specific SSH path detection for common installation locations
+  - Implement fallback detection for SSH installations in PATH
+  - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6_
+
+- [x] 12.2 Maintain Unix compatibility
+  - Keep `which ssh` detection for Linux and macOS systems
+  - Ensure backward compatibility with existing Unix SSH installations
+  - Test SSH detection on multiple Unix-like platforms
+  - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6_
+
+- [x] 12.3 Add comprehensive error handling
+  - Provide clear error messages when SSH is not detected
+  - Add user guidance for SSH installation on different platforms
+  - Implement graceful degradation when SSH is unavailable
+  - _Requirements: 7.6_
+
+- [x] 12.4 Test cross-platform compatibility
+  - Test SSH detection on Windows with various SSH installations
+  - Test SSH detection on Linux and macOS systems
+  - Verify extension behavior when SSH is not available
+  - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6_

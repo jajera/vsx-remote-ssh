@@ -460,8 +460,38 @@ async function importConfiguration(): Promise<void> {
 function checkSSHAvailable(): boolean {
   try {
     const { execSync } = require('child_process');
-    execSync('which ssh', { stdio: 'ignore' });
-    return true;
+    const os = require('os');
+    
+    if (os.platform() === 'win32') {
+      // Windows: Check multiple possible SSH locations
+      const possiblePaths = [
+        'ssh.exe',
+        'C:\\Windows\\System32\\OpenSSH\\ssh.exe',
+        'C:\\Program Files\\Git\\usr\\bin\\ssh.exe',
+        'C:\\Program Files\\OpenSSH\\ssh.exe'
+      ];
+      
+      for (const path of possiblePaths) {
+        try {
+          execSync(`${path} --version`, { stdio: 'ignore' });
+          return true;
+        } catch {
+          continue;
+        }
+      }
+      
+      // If none of the specific paths work, try 'ssh' (might be in PATH)
+      try {
+        execSync('ssh --version', { stdio: 'ignore' });
+        return true;
+      } catch {
+        return false;
+      }
+    } else {
+      // Unix-like systems: use 'which ssh'
+      execSync('which ssh', { stdio: 'ignore' });
+      return true;
+    }
   } catch {
     return false;
   }
