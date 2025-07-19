@@ -2,7 +2,7 @@
   "name": "vsx-remote-ssh",
   "displayName": "Remote SSH",
   "description": "Connect to and develop on remote servers via SSH",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "type": "module",
   "publisher": "jajera",
   "repository": {
@@ -34,9 +34,7 @@
     "sftp"
   ],
   "activationEvents": [
-    "onCommand:remote-ssh.connect",
-    "onCommand:remote-ssh.addHost",
-    "onFileSystem:ssh"
+    "onStartupFinished"
   ],
   "main": "./out/extension.js",
   "contributes": {
