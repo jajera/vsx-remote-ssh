@@ -326,7 +326,7 @@ async function openRemoteWorkspace(): Promise<void> {
   try {
     await vscode.commands.executeCommand('vscode.openFolder', uri);
     vscode.window.showInformationMessage(`Opening remote workspace: ${username}@${host}:${remotePath}`);
-  } catch (error) {
+        } catch (error) {
     vscode.window.showErrorMessage(`Failed to open remote workspace: ${error}`);
   }
 }
@@ -377,11 +377,11 @@ function showHostInfo(hostId?: string): void {
   
   const info = `Host: ${savedHost.host}\nUsername: ${savedHost.username}\nPort: ${savedHost.port}\nDefault: ${hostId === defaultHost ? 'Yes' : 'No'}`;
   vscode.window.showInformationMessage(`Host Information for ${hostId}:\n${info}`);
-}
+  }
 
-/**
- * Show cache statistics
- */
+  /**
+   * Show cache statistics
+   */
 function showCacheStatistics(): void {
   const stats = {
     activeConnections: activeConnections.size,
@@ -391,10 +391,10 @@ function showCacheStatistics(): void {
   };
   
   const message = `Cache Statistics:\nActive Connections: ${stats.activeConnections}\nActive Terminals: ${stats.activeTerminals}\nSaved Hosts: ${stats.savedHosts}\nDefault Host: ${stats.defaultHost}`;
-  vscode.window.showInformationMessage(message);
-}
+    vscode.window.showInformationMessage(message);
+  }
 
-/**
+  /**
  * Clear cache
  */
 function clearCache(): void {
@@ -404,12 +404,12 @@ function clearCache(): void {
   savedHosts.clear();
   defaultHost = null;
   
-  vscode.window.showInformationMessage('Cache cleared successfully');
-}
+      vscode.window.showInformationMessage('Cache cleared successfully');
+  }
 
-/**
- * Export configuration
- */
+  /**
+   * Export configuration
+   */
 function exportConfiguration(): void {
   const config = {
     savedHosts: Array.from(savedHosts.entries()),
@@ -421,11 +421,11 @@ function exportConfiguration(): void {
   
   vscode.window.showInformationMessage('Configuration exported to clipboard');
   vscode.env.clipboard.writeText(configStr);
-}
+  }
 
-/**
- * Import configuration
- */
+  /**
+   * Import configuration
+   */
 async function importConfiguration(): Promise<void> {
   const configStr = await vscode.window.showInputBox({
     prompt: 'Paste configuration JSON',
@@ -448,13 +448,13 @@ async function importConfiguration(): Promise<void> {
       defaultHost = config.defaultHost;
     }
     
-    vscode.window.showInformationMessage('Configuration imported successfully');
-  } catch (error) {
-    vscode.window.showErrorMessage(`Failed to import configuration: ${error}`);
+      vscode.window.showInformationMessage('Configuration imported successfully');
+    } catch (error) {
+      vscode.window.showErrorMessage(`Failed to import configuration: ${error}`);
+    }
   }
-}
 
-/**
+  /**
  * Check if system ssh is available
  */
 function checkSSHAvailable(): boolean {
