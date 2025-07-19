@@ -107,13 +107,15 @@ export class SSHRemoteExtension {
       // Initialize the extension bridge extension
       this.extensionBridgeExt.initialize();
 
-      // Register commands using the command palette integration
-      this.commandPaletteIntegration.registerCommands();
-
-      // Ensure the main command is registered directly as well for redundancy
+      // Register critical commands directly first for immediate availability
       this.context.subscriptions.push(
-        vscode.commands.registerCommand('remote-ssh.connect', () => this.extensionBridge.showHostSelection())
+        vscode.commands.registerCommand('remote-ssh.connect', () => this.extensionBridge.showHostSelection()),
+        vscode.commands.registerCommand('remote-ssh.addHost', () => this.extensionBridge.addNewHost()),
+        vscode.commands.registerCommand('remote-ssh.manageHosts', () => this.extensionBridge.showHostManagement())
       );
+      
+      // Register all commands using the command palette integration
+      this.commandPaletteIntegration.registerCommands();
 
       // Load cached data
       await this.fileCache.loadFromDisk();
@@ -297,6 +299,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     
     // Register additional utility commands
     context.subscriptions.push(
+      // Ensure critical commands are registered directly for redundancy
+      vscode.commands.registerCommand('remote-ssh.connect', () => 
+        extension.getExtensionBridge().showHostSelection()),
+      
+      vscode.commands.registerCommand('remote-ssh.addHost', () => 
+        extension.getExtensionBridge().addNewHost()),
+      
+      vscode.commands.registerCommand('remote-ssh.manageHosts', () => 
+        extension.getExtensionBridge().showHostManagement()),
+      
+      // Utility commands
       vscode.commands.registerCommand('remote-ssh.showCacheStatistics', () => {
         // Show cache statistics in a notification
         vscode.window.showInformationMessage('Cache statistics feature not implemented yet');
