@@ -4,6 +4,8 @@
 
 This feature involves creating a Visual Studio Code extension (VSX) that enables developers to connect to and work with remote servers via SSH. The extension will allow users to edit files, run commands, and develop applications on remote machines as if they were working locally, providing a seamless remote development experience.
 
+Additionally, this document addresses the module system compatibility issue that was preventing the extension from activating properly. The extension was configured to use ES modules (ESM) with "type": "module" in package.json, but the VS Code extension host was attempting to load it using CommonJS (CJS). This incompatibility needs to be resolved to ensure the extension can be properly loaded and activated by VS Code.
+
 ## Requirements
 
 ### Requirement 1
@@ -77,3 +79,36 @@ This feature involves creating a Visual Studio Code extension (VSX) that enables
 3. WHEN SSH connections are interrupted THEN the system SHALL attempt automatic reconnection
 4. WHEN reconnection fails THEN the system SHALL notify the user and provide manual reconnection options
 5. WHEN closing VS Code THEN the system SHALL properly terminate SSH connections and clean up resources
+
+### Requirement 7
+
+**User Story:** As a VSX Remote SSH extension user, I want the extension to load and activate properly without module system errors, so that I can use the extension's functionality to connect to remote servers via SSH.
+
+#### Acceptance Criteria for Requirement 7
+
+1. WHEN the extension is installed THEN the extension SHALL load without module system compatibility errors
+2. WHEN the extension is activated THEN the extension SHALL initialize properly without throwing ESM/CommonJS compatibility errors
+3. IF the extension is configured with "type": "module" in package.json THEN the extension code SHALL be properly structured to be compatible with VS Code's extension loading mechanism
+4. WHEN the extension is activated THEN all extension functionality SHALL work as expected
+
+### Requirement 8
+
+**User Story:** As a VSX Remote SSH extension developer, I want a clear module system configuration that works with VS Code's extension host, so that I can maintain and extend the codebase without encountering module system incompatibilities.
+
+#### Acceptance Criteria for Requirement 8
+
+1. WHEN developing the extension THEN the module system configuration SHALL be consistent across all files
+2. WHEN building the extension THEN the build process SHALL produce output compatible with VS Code's extension host
+3. IF using ES modules THEN the extension SHALL properly handle imports and exports in a way that's compatible with VS Code's extension host
+4. WHEN importing modules THEN the extension SHALL use the correct import syntax based on the module system configuration
+
+### Requirement 9
+
+**User Story:** As a VSX Remote SSH extension maintainer, I want a solution that minimizes code changes while fixing the module system incompatibility, so that I can maintain backward compatibility and reduce the risk of introducing new bugs.
+
+#### Acceptance Criteria for Requirement 9
+
+1. WHEN implementing the fix THEN the solution SHALL require minimal changes to the existing codebase
+2. WHEN implementing the fix THEN the solution SHALL preserve the existing functionality of the extension
+3. IF changing the module system configuration THEN the solution SHALL ensure all dependencies are compatible with the chosen approach
+4. WHEN the fix is implemented THEN the extension SHALL maintain compatibility with the specified VS Code engine version (^1.74.0)

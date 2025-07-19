@@ -47,73 +47,20 @@ export class ExtensionHostBridgeImpl implements ExtensionHostBridge {
   }
 
   async initialize(): Promise<void> {
-    // Register commands
-    this.registerCommands();
+    // Initialize the host configuration UI
+    this.hostConfigUI = new HostConfigurationUI(this.configManager);
     
-    // Set up status bar
+    // Create status bar item
+    this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
     this.statusBarItem.text = '$(server) SSH Remote';
     this.statusBarItem.tooltip = 'SSH Remote Extension';
-    this.statusBarItem.command = 'remote-ssh.showConnections';
     this.statusBarItem.show();
-
-    // Register file system provider for SSH URIs
-    const sshFileSystemProvider = new SSHFileSystemProvider(this.connectionManager, this.fileCache);
-    this.disposables.push(
-      vscode.workspace.registerFileSystemProvider('ssh', sshFileSystemProvider, {
-        isReadonly: false,
-        isCaseSensitive: true
-      })
-    );
-
-    // Set up connection status monitoring
+    this.disposables.push(this.statusBarItem);
+    
+    // Set up connection monitoring
     this.setupConnectionMonitoring();
-
-    // Load cached data
-    await this.fileCache.loadFromDisk();
-  }
-
-  private registerCommands(): void {
-    // Connect to SSH host
-    this.disposables.push(
-      vscode.commands.registerCommand('remote-ssh.connect', async () => {
-        await this.showHostSelection();
-      })
-    );
-
-    // Disconnect from SSH host
-    this.disposables.push(
-      vscode.commands.registerCommand('remote-ssh.disconnect', async () => {
-        await this.disconnectCurrentHost();
-      })
-    );
-
-    // Show active connections
-    this.disposables.push(
-      vscode.commands.registerCommand('remote-ssh.showConnections', () => {
-        this.showActiveConnections();
-      })
-    );
-
-    // Open terminal
-    this.disposables.push(
-      vscode.commands.registerCommand('remote-ssh.openTerminal', async () => {
-        await this.openTerminalForCurrentConnection();
-      })
-    );
-
-    // Add new host
-    this.disposables.push(
-      vscode.commands.registerCommand('remote-ssh.addHost', async () => {
-        await this.addNewHost();
-      })
-    );
-
-    // Manage hosts
-    this.disposables.push(
-      vscode.commands.registerCommand('remote-ssh.manageHosts', () => {
-        this.showHostManagement();
-      })
-    );
+    
+    console.log('Extension Host Bridge initialized');
   }
 
   private setupConnectionMonitoring(): void {
@@ -520,64 +467,6 @@ export class ExtensionHostBridgeImpl implements ExtensionHostBridge {
 }
 
 // Helper classes for VS Code integration
-class SSHFileSystemProvider implements vscode.FileSystemProvider {
-  constructor(
-    private connectionManager: SSHConnectionManagerImpl,
-    private fileCache: RemoteFileCache
-  ) {}
-
-  // Implementation would delegate to RemoteFileSystemProvider
-  // This is a simplified version
-  onDidChangeFile = new vscode.EventEmitter<vscode.FileChangeEvent[]>().event;
-  
-  watch(): vscode.FileSystemWatcher {
-    return {
-      ignoreCreateEvents: false,
-      ignoreChangeEvents: false,
-      ignoreDeleteEvents: false,
-      onDidCreate: new vscode.EventEmitter<vscode.Uri>().event,
-      onDidChange: new vscode.EventEmitter<vscode.Uri>().event,
-      onDidDelete: new vscode.EventEmitter<vscode.Uri>().event,
-      dispose: () => {}
-    };
-  }
-
-  async readFile(uri: vscode.Uri): Promise<Uint8Array> {
-    // Implementation would use RemoteFileSystemProvider
-    throw new Error('Not implemented');
-  }
-
-  async writeFile(uri: vscode.Uri, content: Uint8Array): Promise<void> {
-    // Implementation would use RemoteFileSystemProvider
-    throw new Error('Not implemented');
-  }
-
-  async delete(uri: vscode.Uri): Promise<void> {
-    // Implementation would use RemoteFileSystemProvider
-    throw new Error('Not implemented');
-  }
-
-  async rename(oldUri: vscode.Uri, newUri: vscode.Uri): Promise<void> {
-    // Implementation would use RemoteFileSystemProvider
-    throw new Error('Not implemented');
-  }
-
-  async stat(uri: vscode.Uri): Promise<vscode.FileStat> {
-    // Implementation would use RemoteFileSystemProvider
-    throw new Error('Not implemented');
-  }
-
-  async readDirectory(uri: vscode.Uri): Promise<[string, vscode.FileType][]> {
-    // Implementation would use RemoteFileSystemProvider
-    throw new Error('Not implemented');
-  }
-
-  createDirectory(uri: vscode.Uri): Promise<void> {
-    // Implementation would use RemoteFileSystemProvider
-    throw new Error('Not implemented');
-  }
-}
-
 class VSCodeFileSystemProvider implements vscode.FileSystemProvider {
   constructor(private remoteProvider: RemoteFileSystemProviderImpl) {}
 

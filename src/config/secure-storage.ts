@@ -8,6 +8,7 @@ import { SecureStorage } from '../interfaces/configuration';
 export class VSCodeSecureStorage implements SecureStorage {
   private secretStorage: vscode.SecretStorage;
   private readonly keyPrefix: string = 'vsx-remote-ssh-';
+  private storedKeys: Set<string> = new Set();
 
   constructor(context: vscode.ExtensionContext) {
     this.secretStorage = context.secrets;
@@ -19,7 +20,9 @@ export class VSCodeSecureStorage implements SecureStorage {
    * @param value The value to store
    */
   async store(key: string, value: string): Promise<void> {
-    await this.secretStorage.store(`${this.keyPrefix}${key}`, value);
+    const fullKey = `${this.keyPrefix}${key}`;
+    await this.secretStorage.store(fullKey, value);
+    this.storedKeys.add(fullKey);
   }
 
   /**
@@ -36,16 +39,20 @@ export class VSCodeSecureStorage implements SecureStorage {
    * @param key The key to delete
    */
   async delete(key: string): Promise<void> {
-    await this.secretStorage.delete(`${this.keyPrefix}${key}`);
+    const fullKey = `${this.keyPrefix}${key}`;
+    await this.secretStorage.delete(fullKey);
+    this.storedKeys.delete(fullKey);
   }
 
   /**
    * Clear all securely stored values for this extension
    */
   async clear(): Promise<void> {
-    // VS Code doesn't provide a direct way to clear all secrets
-    // This would require tracking all keys separately
-    // For now, this is a placeholder
-    console.warn('Clear all secrets not implemented');
+    // Delete all tracked keys
+    const deletePromises = Array.from(this.storedKeys).map(key => 
+      this.secretStorage.delete(key)
+    );
+    await Promise.all(deletePromises);
+    this.storedKeys.clear();
   }
 }

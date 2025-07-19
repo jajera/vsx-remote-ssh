@@ -2,7 +2,7 @@
   "name": "vsx-remote-ssh",
   "displayName": "Remote SSH",
   "description": "Connect to and develop on remote servers via SSH",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "publisher": "jajera",
   "repository": {
     "type": "git",
@@ -33,10 +33,26 @@
     "sftp"
   ],
   "activationEvents": [
-    "onStartupFinished",
     "onCommand:remote-ssh.connect",
     "onCommand:remote-ssh.addHost",
-    "onCommand:remote-ssh.manageHosts"
+    "onCommand:remote-ssh.disconnect",
+    "onCommand:remote-ssh.reconnect",
+    "onCommand:remote-ssh.showConnections",
+    "onCommand:remote-ssh.manageHosts",
+    "onCommand:remote-ssh.editHost",
+    "onCommand:remote-ssh.deleteHost",
+    "onCommand:remote-ssh.setDefaultHost",
+    "onCommand:remote-ssh.testConnection",
+    "onCommand:remote-ssh.openTerminal",
+    "onCommand:remote-ssh.closeTerminals",
+    "onCommand:remote-ssh.openWorkspace",
+    "onCommand:remote-ssh.switchWorkspace",
+    "onCommand:remote-ssh.showHostInfo",
+    "onCommand:remote-ssh.showCacheStatistics",
+    "onCommand:remote-ssh.clearCache",
+    "onCommand:remote-ssh.exportConfiguration",
+    "onCommand:remote-ssh.importConfiguration",
+    "onCommand:remote-ssh.test"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -135,6 +151,11 @@
         "command": "remote-ssh.importConfiguration",
         "title": "Import Configuration",
         "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.test",
+        "title": "Test SSH Extension",
+        "category": "Remote SSH"
       }
     ],
     "configuration": {
@@ -165,7 +186,7 @@
     "lint": "eslint src --ext ts",
     "test": "vitest run",
     "test:watch": "vitest src",
-    "package": "npx @vscode/vsce package --no-dependencies",
+    "package": "npx @vscode/vsce package",
     "compile:watch": "tsc -watch -p ./",
     "extension:dev": "npm run compile && code --extensionDevelopmentPath=.",
     "extension:test": "npm run compile && code --extensionDevelopmentPath=. --disable-extensions",
@@ -185,11 +206,13 @@
     "rimraf": "^5.0.1",
     "ts-node": "^10.9.1",
     "typedoc": "^0.25.0",
-    "typescript": "^5.0.0",
+    "typescript": "^5.8.3",
     "vitest": "^3.2.4"
   },
   "dependencies": {
     "@types/uuid": "^10.0.0",
+    "asn1": "^0.2.6",
+    "bcrypt-pbkdf": "^1.0.2",
     "ssh2": "^1.16.0",
     "ssh2-sftp-client": "^9.1.0",
     "uuid": "^11.1.0"
@@ -197,6 +220,20 @@
   "bundleDependencies": [
     "ssh2",
     "ssh2-sftp-client",
-    "uuid"
+    "uuid",
+    "asn1",
+    "bcrypt-pbkdf"
+  ],
+  "files": [
+    "out/**/*",
+    "resources/**/*",
+    "README.md",
+    "CHANGELOG.md",
+    "package.json",
+    "node_modules/ssh2/**/*",
+    "node_modules/ssh2-sftp-client/**/*",
+    "node_modules/uuid/**/*",
+    "node_modules/asn1/**/*",
+    "node_modules/bcrypt-pbkdf/**/*"
   ]
 }

@@ -64,7 +64,7 @@
   - Write tests for session management and persistence
   - _Requirements: 3.4, 3.5_
 
-- [ ] 5. Implement configuration management system
+- [x] 5. Implement configuration management system
 - [x] 5.1 Create SSH host configuration storage
   - Implement ConfigurationManager for secure credential storage
   - Add support for saving, loading, and managing SSH host configurations
@@ -145,3 +145,75 @@
   - Implement extension activation and lifecycle management
   - Write final integration tests and prepare for release
   - _Requirements: All requirements_
+
+- [x] 11. Fix module system compatibility issues
+- [x] 11.1 Update package.json configuration
+  - Remove "type": "module" from package.json to default to CommonJS
+  - Update activationEvents to use "onStartupFinished" instead of individual command events
+  - _Requirements: 7.1, 7.3, 8.1, 9.1_
+
+- [x] 11.2 Update import/export syntax in extension.ts
+  - Convert ESM import statements to CommonJS require statements
+  - Convert ESM export statements to CommonJS exports
+  - Ensure proper command registration in activate function
+  - _Requirements: 7.1, 7.2, 8.1, 8.3, 8.4_
+
+- [x] 11.3 Update import/export syntax in error-classifier.js
+  - Convert ESM import statements to CommonJS require statements
+  - Convert ESM export statements to CommonJS exports
+  - Fix module.exports syntax to ensure proper exports
+  - _Requirements: 7.1, 7.2, 8.1, 8.3, 8.4_
+
+- [x] 11.4 Scan and update other files with ESM syntax
+  - Identify other files that use ESM-specific syntax
+  - Convert ESM import/export statements to CommonJS in those files
+  - Ensure consistent module system usage across all files
+  - _Requirements: 7.1, 7.2, 8.1, 8.2, 8.3, 8.4_
+
+- [x] 11.5 Update TypeScript configuration
+  - Set "module": "commonjs" in tsconfig.json
+  - Ensure TypeScript compiler generates CommonJS output
+  - Fix any TypeScript errors related to module system changes
+  - _Requirements: 7.1, 7.2, 8.1, 8.2_
+
+- [x] 11.6 Identify and resolve command registration conflicts
+  - Debug command registration issues between extension.ts and test-extension.ts
+  - Fix duplicate command registration problems
+  - Ensure all commands are properly registered in a single place
+  - _Requirements: 7.1, 7.2, 7.4, 9.2, 9.4_
+
+- [x] 11.7 Test extension activation
+  - Verify that the extension activates without module system errors
+  - Test that all commands are registered correctly and appear in command palette
+  - Debug any activation errors that occur
+  - _Requirements: 7.1, 7.2, 7.4, 9.2, 9.4_
+
+- [x] 11.8 Test extension functionality
+  - Test SSH connection functionality
+  - Test file system operations
+  - Test terminal operations
+  - _Requirements: 7.4, 9.2_
+
+- [x] 11.9 Update documentation
+  - Update any documentation that references the module system
+  - Document the changes made to fix the module system incompatibility
+  - Add notes about potential pitfalls for future developers
+  - _Requirements: 8.1, 9.1, 9.2_
+
+- [x] 11.10 Install dependencies
+  - Install required npm dependencies
+  - Ensure dependencies are properly bundled with the extension
+  - Update bundleDependencies in package.json to include all required modules
+  - _Requirements: 7.1, 7.2, 7.4, 9.2_
+
+- [x] 11.11 Prevent test file conflicts
+  - Design test files to avoid conflicts with main extension files
+  - Implement proper test isolation to prevent command registration conflicts
+  - Ensure clean separation between production and test code
+  - _Requirements: 7.1, 7.2, 7.4, 9.1, 9.2_
+
+- [x] 11.12 Clean up unnecessary files
+  - Remove unused image.png file from the root directory
+  - Ensure all assets are properly organized in the resources directory
+  - Remove any other unnecessary files that aren't dependencies
+  - _Requirements: 9.1, 9.2_
