@@ -266,6 +266,7 @@ Remote SSH: Show Cache Statistics
 - **"Authentication failed"**: Verify credentials
 - **"Host key verification failed"**: Accept host key manually first
 - **"Connection timeout"**: Check network and firewall settings
+- **"ERR_REQUIRE_ESM" or module compatibility errors**: The extension uses CommonJS modules. If you encounter module system compatibility errors, ensure your VS Code version is compatible and the extension is properly installed.
 
 ### Performance Issues
 
