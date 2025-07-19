@@ -60,6 +60,26 @@ jobs:
             echo "NEW_VERSION=$CURRENT_VERSION" >> $GITHUB_OUTPUT
           fi
 
+      - name: Check Namespace Exists
+        if: steps.version_check.outputs.SHOULD_RELEASE == 'true'
+        run: |
+          echo "🔍 Checking if namespace exists in Open VSX Registry..."
+          
+          # Install ovsx CLI
+          npm install -g ovsx
+          
+          # Check if namespace exists
+          if ovsx search --query "publisher:${{ github.repository_owner }}" | grep -q "${{ github.repository_owner }}"; then
+            echo "✅ Namespace '${{ github.repository_owner }}' already exists in Open VSX Registry"
+            echo "NAMESPACE_EXISTS=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Namespace '${{ github.repository_owner }}' does not exist in Open VSX Registry"
+            echo "NAMESPACE_EXISTS=false" >> $GITHUB_OUTPUT
+            echo ""
+            echo "🔧 To create the namespace, run the 'Create Open VSX Namespace' workflow first"
+            echo "Or manually run: ovsx create-namespace ${{ github.repository_owner }}"
+          fi
+
       - name: Verify Publisher and Extension Info
         if: steps.version_check.outputs.SHOULD_RELEASE == 'true'
         run: |
@@ -70,11 +90,12 @@ jobs:
           echo "Display Name: $(node -p "require('./package.json').displayName")"
           echo ""
           echo "⚠️  IMPORTANT: Make sure your Open VSX Registry account matches the publisher name!"
-          echo "Current publisher: vsx-remote-ssh"
+          echo "Current publisher: $(node -p "require('./package.json').publisher")"
+          echo "GitHub username: ${{ github.repository_owner }}"
           echo "If this doesn't match your Open VSX account, update package.json publisher field."
 
       - name: Publish to Open VSX Registry
-        if: steps.version_check.outputs.SHOULD_RELEASE == 'true'
+        if: steps.version_check.outputs.SHOULD_RELEASE == 'true' && steps.check_namespace.outputs.NAMESPACE_EXISTS == 'true'
         run: |
           if [ -z "$OVSX_PAT" ]; then
             echo "❌ OVSX_PAT secret not set. Skipping Open VSX Registry publish."
@@ -82,24 +103,24 @@ jobs:
             echo "Get your token from: https://open-vsx.org/user-settings/tokens"
             exit 0
           fi
-
+          
           echo "📦 Publishing version ${{ steps.version_check.outputs.NEW_VERSION }} to Open VSX Registry..."
-          echo "Publisher: vsx-remote-ssh"
+          echo "Publisher: $(node -p "require('./package.json').publisher")"
           echo "Extension: vsx-remote-ssh"
           echo "Registry: https://open-vsx.org"
-
+          
           # Publish to Open VSX Registry using ovsx CLI
           npx ovsx publish --packagePath ${{ steps.package_vsix.outputs.vsix_path }}
-
+          
           if [ $? -eq 0 ]; then
             echo "✅ Successfully published to Open VSX Registry!"
-            echo "🔗 View your extension at: https://open-vsx.org/extension/vsx-remote-ssh/vsx-remote-ssh"
+            echo "🔗 View your extension at: https://open-vsx.org/extension/$(node -p "require('./package.json').publisher")/vsx-remote-ssh"
           else
             echo "❌ Failed to publish to Open VSX Registry"
             echo ""
             echo "🔧 Troubleshooting steps:"
             echo "1. Check your OVSX_PAT token at: https://open-vsx.org/user-settings/tokens"
-            echo "2. Verify your Open VSX account matches publisher: vsx-remote-ssh"
+            echo "2. Verify your Open VSX account matches publisher: $(node -p "require('./package.json').publisher")"
             echo "3. Make sure the token has publish permissions"
             echo "4. Check if the extension name is already taken"
             exit 1
@@ -108,7 +129,7 @@ jobs:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
 
       - name: Create GitHub Release
-        if: steps.version_check.outputs.SHOULD_RELEASE == 'true'
+        if: steps.version_check.outputs.SHOULD_RELEASE == 'true' && steps.check_namespace.outputs.NAMESPACE_EXISTS == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version_check.outputs.NEW_VERSION }}
