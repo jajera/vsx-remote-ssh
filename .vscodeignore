@@ -1,0 +1,22 @@
+.vscode/**
+.vscode-test/**
+.gitignore
+.yarnrc
+.github/**
+# .kiro/**
+docs/**
+src/**
+test/**
+tests/**
+scripts/**
+node_modules/**
+out/test/**
+out/**/*.map
+tsconfig.json
+vitest.config.*
+.eslintrc.json
+**/*.ts
+**/*.map
+**/.DS_Store
+*.vsix
+.git/**

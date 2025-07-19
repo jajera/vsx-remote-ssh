@@ -1,0 +1,197 @@
+{
+  "name": "vsx-remote-ssh",
+  "displayName": "Remote SSH",
+  "description": "Connect to and develop on remote servers via SSH",
+  "version": "1.0.0",
+  "type": "module",
+  "publisher": "vsx-remote-ssh",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jajera/vsx-remote-ssh.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jajera/vsx-remote-ssh/issues"
+  },
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/jajera/vsx-remote-ssh",
+  "galleryBanner": {
+    "color": "#1e415e",
+    "theme": "dark"
+  },
+  "icon": "resources/icon.png",
+  "categories": [
+    "Other",
+    "Remote Development"
+  ],
+  "keywords": [
+    "ssh",
+    "remote",
+    "development",
+    "server",
+    "sftp"
+  ],
+  "activationEvents": [
+    "onCommand:remote-ssh.connect",
+    "onCommand:remote-ssh.addHost",
+    "onFileSystem:ssh"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "remote-ssh.connect",
+        "title": "Connect to Host via SSH",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.addHost",
+        "title": "Add SSH Host",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.disconnect",
+        "title": "Disconnect",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.reconnect",
+        "title": "Reconnect",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.showConnections",
+        "title": "Show Active Connections",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.manageHosts",
+        "title": "Manage SSH Hosts",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.editHost",
+        "title": "Edit SSH Host",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.deleteHost",
+        "title": "Delete SSH Host",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.setDefaultHost",
+        "title": "Set Default Host",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.testConnection",
+        "title": "Test SSH Connection",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.openTerminal",
+        "title": "Open Remote Terminal",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.closeTerminals",
+        "title": "Close All Terminals",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.openWorkspace",
+        "title": "Open Remote Workspace",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.switchWorkspace",
+        "title": "Switch Workspace",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.showHostInfo",
+        "title": "Show Host Information",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.showCacheStatistics",
+        "title": "Show Cache Statistics",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.clearCache",
+        "title": "Clear Cache",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.exportConfiguration",
+        "title": "Export Configuration",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.importConfiguration",
+        "title": "Import Configuration",
+        "category": "Remote SSH"
+      }
+    ],
+    "configuration": {
+      "title": "Remote SSH",
+      "properties": {
+        "remote-ssh.defaultPort": {
+          "type": "number",
+          "default": 22,
+          "description": "Default SSH port"
+        },
+        "remote-ssh.connectTimeout": {
+          "type": "number",
+          "default": 15000,
+          "description": "Connection timeout in milliseconds"
+        },
+        "remote-ssh.reconnectAttempts": {
+          "type": "number",
+          "default": 3,
+          "description": "Number of automatic reconnection attempts"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "vitest run",
+    "test:watch": "vitest src",
+    "package": "npx @vscode/vsce package",
+    "compile:watch": "tsc -watch -p ./",
+    "extension:dev": "npm run compile && code --extensionDevelopmentPath=.",
+    "extension:test": "npm run compile && code --extensionDevelopmentPath=. --disable-extensions",
+    "changelog": "node scripts/generate-changelog.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/ssh2": "^1.15.5",
+    "@types/ssh2-sftp-client": "^9.0.5",
+    "@types/vscode": "^1.74.0",
+    "@typescript-eslint/eslint-plugin": "^5.45.0",
+    "@typescript-eslint/parser": "^5.45.0",
+    "@vscode/vsce": "^2.32.0",
+    "eslint": "^8.28.0",
+    "markdown-it": "^13.0.1",
+    "markdownlint-cli": "^0.45.0",
+    "rimraf": "^5.0.1",
+    "ts-node": "^10.9.1",
+    "typedoc": "^0.25.0",
+    "typescript": "^5.0.0",
+    "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "@types/uuid": "^10.0.0",
+    "ssh2": "^1.11.0",
+    "ssh2-sftp-client": "^9.1.0",
+    "uuid": "^11.1.0"
+  }
+}
