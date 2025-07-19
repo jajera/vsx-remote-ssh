@@ -54,4 +54,12 @@ jobs:
             exit 1
           fi
           echo "✅ Extension packaged successfully"
-          ls -la *.vsix 
+          ls -la *.vsix
+
+      - name: Upload VSIX artifact
+        if: inputs.package-extension == true
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-vsix
+          path: "*.vsix"
+          retention-days: 1 

@@ -27,6 +27,12 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Download VSIX artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: extension-vsix
+          path: .
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -39,7 +45,6 @@ jobs:
       - name: Package extension
         id: package_vsix
         run: |
-          npm run package
           echo "vsix_path=$(ls *.vsix)" >> $GITHUB_OUTPUT
           echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
 
