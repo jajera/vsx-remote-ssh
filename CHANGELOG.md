@@ -5,7 +5,16 @@ All notable changes to the SSH Remote Extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0] - 2025-07-19
+## [1.0.5] - 2025-07-19
+
+### Fixed
+
+- Fixed module system compatibility issue by changing from ES modules to CommonJS
+- Updated import/export syntax in extension.ts and error-classifier.ts files
+- Resolved extension activation errors related to module loading
+- Improved compatibility with VS Code's extension host
+
+## [1.0.4] - 2025-07-19
 
 ### Added
 

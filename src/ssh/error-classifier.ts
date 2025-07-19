@@ -11,7 +11,7 @@ import { FileSystemError } from '../interfaces/filesystem';
  * @param error The error to classify
  * @returns Classified SSH error type
  */
-export function classifySSHError(error: Error): SSHErrorType {
+function classifySSHError(error: Error): SSHErrorType {
   if (!error) {
     return SSHErrorType.Unknown;
   }
@@ -112,7 +112,7 @@ export function classifySSHError(error: Error): SSHErrorType {
  * @param message Error message
  * @returns FileSystemError
  */
-export function createFileSystemError(
+function createFileSystemError(
   code: 'FileNotFound' | 'FileExists' | 'NoPermissions' | 'Unavailable' | 'Unknown',
   uri: vscode.Uri,
   message: string
@@ -130,7 +130,7 @@ export function createFileSystemError(
  * @param operation Description of the operation being performed
  * @returns FileSystemError
  */
-export function classifyAndCreateFileSystemError(
+function classifyAndCreateFileSystemError(
   error: Error,
   uri: vscode.Uri,
   operation: string
@@ -290,7 +290,7 @@ export function classifyAndCreateFileSystemError(
  * @param errorType The type of error
  * @returns Array of troubleshooting steps
  */
-export function getTroubleshootingSteps(errorType: SSHErrorType): string[] {
+function getTroubleshootingSteps(errorType: SSHErrorType): string[] {
   switch (errorType) {
     case SSHErrorType.ConnectionRefused:
       return [
@@ -384,7 +384,7 @@ export function getTroubleshootingSteps(errorType: SSHErrorType): string[] {
  * Class-based interface for SSH error classification
  * Provides a more object-oriented approach to error handling
  */
-export class SSHErrorClassifier {
+class SSHErrorClassifier {
   /**
    * Classify an SSH error
    * @param error The error to classify
@@ -457,3 +457,11 @@ export class SSHErrorClassifier {
     ].includes(errorType);
   }
 }
+// Export functions and classes
+export {
+  classifySSHError,
+  createFileSystemError,
+  classifyAndCreateFileSystemError,
+  getTroubleshootingSteps,
+  SSHErrorClassifier
+};

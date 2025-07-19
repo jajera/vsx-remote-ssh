@@ -11,7 +11,7 @@ import { RemoteFileCache } from './ssh/remote-file-cache';
 import { ConfigurationManager } from './config/configuration-manager';
 import { ExtensionHostBridgeImpl } from './vscode/extension-host-bridge';
 import { ExtensionHostBridgeExtension } from './vscode/extension-host-bridge-extension';
-import { SSHErrorClassifier } from './ssh/error-classifier.js';
+import { SSHErrorClassifier } from './ssh/error-classifier';
 import { ConnectionStateManagerImpl } from './ssh/connection-state-manager';
 import { CommandPaletteIntegration } from './vscode/command-palette-integration';
 import { WorkspaceContextManager } from './vscode/workspace-context-manager';
@@ -21,7 +21,7 @@ import { PerformanceMonitor } from './ssh/performance-monitor';
 /**
  * Main extension class that coordinates all SSH remote functionality
  */
-export class SSHRemoteExtension {
+class SSHRemoteExtension {
   private connectionManager: SSHConnectionManagerImpl;
   private configManager: ConfigurationManager;
   private fileCache: RemoteFileCache;
