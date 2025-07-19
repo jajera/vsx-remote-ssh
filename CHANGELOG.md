@@ -1,9 +1,17 @@
-![alt text](image.png)# Change Log
+# Change Log
 
 All notable changes to the SSH Remote Extension will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.0.8] - 2025-07-19
+
+### Fixed in 1.0.8
+
+- Update icon
+- Create status badges
+- Update publish workflow to run only when package.json has been modified
 
 ## [1.0.7] - 2025-07-19
 

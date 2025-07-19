@@ -1,5 +1,9 @@
 # VSX Remote SSH Extension
 
+[![CI](https://github.com/jajera/vsx-remote-ssh/actions/workflows/ci.yml/badge.svg)](https://github.com/jajera/vsx-remote-ssh/actions/workflows/ci.yml)
+
+[![Release to Open VSX Registry](https://github.com/jajera/vsx-remote-ssh/actions/workflows/publish-open-vsx.yml/badge.svg)](https://github.com/jajera/vsx-remote-ssh/actions/workflows/publish-open-vsx.yml)
+
 Connect to and develop on remote servers via SSH with full VS Code integration.
 
 ## Features
