@@ -140,14 +140,14 @@ async function addSSHHost(): Promise<void> {
     placeHolder: 'example.com'
   });
   
-  if (!host) return;
+  if (!host) {return;}
   
   const username = await vscode.window.showInputBox({
     prompt: 'Enter username',
     placeHolder: 'username'
   });
   
-  if (!username) return;
+  if (!username) {return;}
   
   const portStr = await vscode.window.showInputBox({
     prompt: 'Enter port (default: 22)',
@@ -176,7 +176,7 @@ async function manageSSHHosts(): Promise<void> {
     placeHolder: 'Select host to manage'
   });
   
-  if (!selectedHost) return;
+  if (!selectedHost) {return;}
   
   const actions = [
     { label: 'Connect', action: 'connect' },
@@ -189,7 +189,7 @@ async function manageSSHHosts(): Promise<void> {
     placeHolder: 'Select action'
   });
   
-  if (!selectedAction) return;
+  if (!selectedAction) {return;}
   
   switch (selectedAction.action) {
     case 'connect':
@@ -227,14 +227,14 @@ async function editSSHHost(hostId: string): Promise<void> {
     value: savedHost.host
   });
   
-  if (!newHost) return;
+  if (!newHost) {return;}
   
   const newUsername = await vscode.window.showInputBox({
     prompt: 'Enter new username',
     value: savedHost.username
   });
   
-  if (!newUsername) return;
+  if (!newUsername) {return;}
   
   const newPortStr = await vscode.window.showInputBox({
     prompt: 'Enter new port',
@@ -267,7 +267,7 @@ async function deleteSSHHost(hostId?: string): Promise<void> {
     });
   }
   
-  if (!hostId) return;
+  if (!hostId) {return;}
   
   savedHosts.delete(hostId);
   vscode.window.showInformationMessage(`Host ${hostId} deleted`);
@@ -289,7 +289,7 @@ async function setDefaultHost(hostId?: string): Promise<void> {
     });
   }
   
-  if (!hostId) return;
+  if (!hostId) {return;}
   
   defaultHost = hostId;
   vscode.window.showInformationMessage(`Default host set to ${hostId}`);
@@ -304,21 +304,21 @@ async function openRemoteWorkspace(): Promise<void> {
     placeHolder: 'example.com'
   });
   
-  if (!host) return;
+  if (!host) {return;}
   
   const username = await vscode.window.showInputBox({
     prompt: 'Enter username',
     placeHolder: 'username'
   });
   
-  if (!username) return;
+  if (!username) {return;}
   
   const remotePath = await vscode.window.showInputBox({
     prompt: 'Enter remote path to open',
     placeHolder: '/home/username/project'
   });
   
-  if (!remotePath) return;
+  if (!remotePath) {return;}
   
   // Open workspace using VS Code's remote SSH
   const uri = vscode.Uri.parse(`vscode-remote://ssh-remote+${username}@${host}${remotePath}`);
@@ -346,7 +346,7 @@ async function switchWorkspace(): Promise<void> {
     placeHolder: 'Select workspace to switch to'
   });
   
-  if (!selectedWorkspace) return;
+  if (!selectedWorkspace) {return;}
   
   const workspace = workspaces.find(ws => ws.name === selectedWorkspace);
   if (workspace) {
@@ -432,7 +432,7 @@ async function importConfiguration(): Promise<void> {
     placeHolder: '{"savedHosts":[...]}'
   });
   
-  if (!configStr) return;
+  if (!configStr) {return;}
   
   try {
     const config = JSON.parse(configStr);
@@ -502,14 +502,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         placeHolder: 'example.com'
       });
       
-      if (!host) return;
+      if (!host) {return;}
       
       const username = await vscode.window.showInputBox({
         prompt: 'Enter username',
         placeHolder: 'username'
       });
       
-      if (!username) return;
+      if (!username) {return;}
       
       await openTerminalSession(host, username);
     });
@@ -526,14 +526,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         placeHolder: 'example.com'
       });
       
-      if (!host) return;
+      if (!host) {return;}
       
       const username = await vscode.window.showInputBox({
         prompt: 'Enter username',
         placeHolder: 'username'
       });
       
-      if (!username) return;
+      if (!username) {return;}
       
       await testSSHConnection(host, username);
     });
@@ -550,14 +550,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         placeHolder: 'example.com'
       });
       
-      if (!host) return;
+      if (!host) {return;}
       
       const username = await vscode.window.showInputBox({
         prompt: 'Enter username',
         placeHolder: 'username'
       });
       
-      if (!username) return;
+      if (!username) {return;}
       
       await openTerminalSession(host, username);
     });
