@@ -9,6 +9,7 @@ The VSX Remote SSH extension enables seamless remote development by establishing
 ### High-Level Architecture
 
 The extension uses a client-server architecture:
+
 - **Client Side**: VS Code extension running locally
 - **Server Side**: Lightweight server process on remote machine  
 - **Communication**: Secure SSH tunnel for all data transfer
@@ -23,14 +24,15 @@ The extension consists of several key components:
 4. **Extension Host Bridge**: Enables remote extension execution and communication
 5. **Configuration Manager**: Handles SSH host configurations and credential storage
 6. **Reconnection Handler**: Manages connection recovery and state restoration
-## C
-omponents and Interfaces
+
+## Components and Interfaces
 
 ### 1. SSH Connection Manager
 
 **Purpose**: Central component for managing SSH connections and authentication
 
 **Key Interfaces**:
+
 ```typescript
 interface SSHConnectionManager {
   connect(config: SSHConfig): Promise<SSHConnection>
@@ -63,6 +65,7 @@ interface SSHConnection {
 **Purpose**: Implements VS Code's file system interface for remote file operations
 
 **Key Interfaces**:
+
 ```typescript
 interface RemoteFileSystemProvider extends vscode.FileSystemProvider {
   readFile(uri: vscode.Uri): Promise<Uint8Array>
@@ -101,6 +104,7 @@ interface RemoteTerminal {
 **Purpose**: Handles SSH host configurations and secure credential storage
 
 **Key Interfaces**:
+
 ```typescript
 interface ConfigurationManager {
   saveHost(config: SSHHostConfig): Promise<void>
@@ -143,6 +147,7 @@ enum ConnectionStatus {
 ```
 
 ### File System Cache Model
+
 ```typescript
 interface FileSystemCache {
   uri: string
@@ -154,6 +159,7 @@ interface FileSystemCache {
 ```
 
 ### Terminal Session Model
+
 ```typescript
 interface TerminalSession {
   id: string

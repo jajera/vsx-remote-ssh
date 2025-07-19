@@ -10,7 +10,7 @@ This feature involves creating a Visual Studio Code extension (VSX) that enables
 
 **User Story:** As a developer, I want to connect to a remote server via SSH, so that I can develop and edit code on remote machines directly from VS Code.
 
-#### Acceptance Criteria
+#### Acceptance Criteria for Requirement 1
 
 1. WHEN a user opens the command palette and selects "Connect to Host via SSH" THEN the system SHALL prompt for SSH connection details
 2. WHEN a user provides valid SSH credentials (hostname, username, port) THEN the system SHALL establish an SSH connection
@@ -22,7 +22,7 @@ This feature involves creating a Visual Studio Code extension (VSX) that enables
 
 **User Story:** As a developer, I want to browse and edit files on the remote server, so that I can work with remote codebases seamlessly.
 
-#### Acceptance Criteria
+#### Acceptance Criteria for Requirement 2
 
 1. WHEN connected to a remote host THEN the system SHALL display the remote file system in the Explorer panel
 2. WHEN a user opens a remote file THEN the system SHALL load and display the file content in the editor
@@ -34,7 +34,7 @@ This feature involves creating a Visual Studio Code extension (VSX) that enables
 
 **User Story:** As a developer, I want to run terminal commands on the remote server, so that I can execute build scripts, run applications, and perform system administration tasks.
 
-#### Acceptance Criteria
+#### Acceptance Criteria for Requirement 3
 
 1. WHEN connected to a remote host THEN the system SHALL provide access to a remote terminal
 2. WHEN a user opens a terminal THEN the system SHALL establish a shell session on the remote host
@@ -46,7 +46,7 @@ This feature involves creating a Visual Studio Code extension (VSX) that enables
 
 **User Story:** As a developer, I want to manage multiple SSH connections, so that I can work with different remote servers efficiently.
 
-#### Acceptance Criteria
+#### Acceptance Criteria for Requirement 4
 
 1. WHEN a user has multiple SSH hosts configured THEN the system SHALL display a list of available connections
 2. WHEN a user selects a configured host THEN the system SHALL connect using saved connection details
@@ -58,7 +58,7 @@ This feature involves creating a Visual Studio Code extension (VSX) that enables
 
 **User Story:** As a developer, I want VS Code extensions to work on remote files, so that I can use my full development toolchain on remote code.
 
-#### Acceptance Criteria
+#### Acceptance Criteria for Requirement 5
 
 1. WHEN connected to a remote host THEN the system SHALL support running compatible extensions on remote files
 2. WHEN language servers are needed THEN the system SHALL install and run language servers on the remote host
@@ -70,7 +70,7 @@ This feature involves creating a Visual Studio Code extension (VSX) that enables
 
 **User Story:** As a developer, I want secure and reliable SSH connections, so that my remote development work is protected and stable.
 
-#### Acceptance Criteria
+#### Acceptance Criteria for Requirement 6
 
 1. WHEN establishing SSH connections THEN the system SHALL use secure SSH protocols (SSH-2)
 2. WHEN storing SSH credentials THEN the system SHALL use secure credential storage mechanisms

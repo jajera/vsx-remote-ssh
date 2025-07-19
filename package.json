@@ -4,7 +4,7 @@
   "description": "Connect to and develop on remote servers via SSH",
   "version": "1.0.0",
   "type": "module",
-  "publisher": "vsx-remote-ssh",
+  "publisher": "jajera",
   "repository": {
     "type": "git",
     "url": "https://github.com/jajera/vsx-remote-ssh.git"
