@@ -5,6 +5,10 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: write
+  packages: write
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -112,14 +116,41 @@ jobs:
 
       - name: Create GitHub Release
         if: steps.version_check.outputs.SHOULD_RELEASE == 'true'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ steps.version_check.outputs.NEW_VERSION }}
-          name: Release ${{ steps.version_check.outputs.NEW_VERSION }}
-          files: ${{ steps.package_vsix.outputs.vsix_path }}
-          generate_release_notes: true
-          draft: false
-          prerelease: false
+        run: |
+          echo "📦 Creating GitHub release for version ${{ steps.version_check.outputs.NEW_VERSION }}..."
+          
+          # Create release using GitHub CLI
+          gh release create "v${{ steps.version_check.outputs.NEW_VERSION }}" \
+            --title "Release ${{ steps.version_check.outputs.NEW_VERSION }}" \
+            --notes "## SSH Remote Extension ${{ steps.version_check.outputs.NEW_VERSION }}
+
+          ### What's New
+          - See [CHANGELOG.md](CHANGELOG.md) for detailed changes
+
+          ### Installation
+          \`\`\`bash
+          # From Open VSX Registry
+          # Search for \"SSH Remote\" and install
+
+          # Or from VSIX file
+          code --install-extension vsx-remote-ssh-${{ steps.version_check.outputs.NEW_VERSION }}.vsix
+          \`\`\`
+
+          ### Features
+          - 🔐 Secure SSH Connections
+          - 📁 Remote File System
+          - 🖥️ Integrated Terminal
+          - 📊 Performance Monitoring
+          - 🗂️ Workspace Management
+
+          ### Documentation
+          - [README.md](README.md) - User guide
+          - [PUBLISHING.md](PUBLISHING.md) - Development guide" \
+            --draft=false \
+            --prerelease=false \
+            "${{ steps.package_vsix.outputs.vsix_path }}"
+          
+          echo "✅ GitHub release created successfully!"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
