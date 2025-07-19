@@ -1,0 +1,57 @@
+name: Validate Extension
+
+on:
+  workflow_call:
+    inputs:
+      package-extension:
+        description: 'Whether to package the extension'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linting
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test
+
+      - name: Security audit
+        run: npm audit --audit-level=moderate
+
+      - name: Build extension
+        run: npm run compile
+
+      - name: Package extension
+        if: inputs.package-extension == true
+        id: package_vsix
+        run: |
+          npm run package
+          echo "vsix_path=$(ls *.vsix)" >> $GITHUB_OUTPUT
+          echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Verify package contents
+        if: inputs.package-extension == true
+        run: |
+          if [ ! -f *.vsix ]; then
+            echo "Error: No VSIX file was created"
+            exit 1
+          fi
+          echo "✅ Extension packaged successfully"
+          ls -la *.vsix 
