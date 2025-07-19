@@ -26,18 +26,21 @@ The extension consists of several key components:
 4. **Extension Host Bridge**: Enables remote extension execution and communication
 5. **Configuration Manager**: Handles SSH host configurations and credential storage
 6. **Reconnection Handler**: Manages connection recovery and state restoration
+7. **SSH Detection**: Cross-platform SSH availability detection with Windows-specific support
 
 ## Module System Compatibility
 
 ### Problem Statement
 
 The extension is currently failing to activate due to a module system incompatibility. The error message indicates:
-```
+
+```plaintext
 Error [ERR_REQUIRE_ESM]: require() of ES Module [...]/extension.js from [...]/extensionHostProcess.js not supported.
 extension.js is treated as an ES module file as it is a .js file whose nearest parent package.json contains "type": "module" which declares all .js files in that package scope as ES modules.
 ```
 
 The error message suggests three possible solutions:
+
 1. Rename extension.js to end in .cjs
 2. Change the requiring code to use dynamic import()
 3. Change "type": "module" to "type": "commonjs" in package.json
@@ -63,12 +66,16 @@ During implementation, we encountered several significant challenges:
 
 4. **Module Resolution Conflicts**: The presence of both ESM and CommonJS syntax in different files caused module resolution conflicts, where imports would fail because the expected module format didn't match the actual format.
 
+5. **Cross-Platform SSH Detection**: The original SSH detection used Unix-specific `which ssh` command, which doesn't work on Windows. We needed to implement platform-specific detection logic.
+
 Resolving these issues required:
+
 - Removing the test-extension.ts file completely
 - Simplifying the extension implementation to focus on core functionality
 - Ensuring consistent module syntax across all files
 - Properly registering all commands in the extension.ts file
 - Updating the activation events in package.json
+- Implementing cross-platform SSH detection with Windows-specific paths
 
 ### Implementation Details
 
@@ -83,6 +90,85 @@ Resolving these issues required:
 3. **File Cleanup**:
    - Remove test-extension.ts file that was causing conflicts
    - Simplify extension implementation to improve compatibility
+
+4. **Cross-Platform SSH Detection**:
+   - Implement platform-specific SSH detection logic
+   - Add Windows-specific SSH path detection
+   - Maintain Unix compatibility with `which ssh` fallback
+
+## SSH Detection System
+
+### Cross-Platform Detection
+
+The extension implements a robust SSH detection system that works across different operating systems:
+
+#### Windows Detection
+
+The system checks multiple common SSH installation locations on Windows:
+
+1. **System PATH**: `ssh.exe` (if SSH is in the system PATH)
+2. **Windows OpenSSH**: `C:\Windows\System32\OpenSSH\ssh.exe` (built-in Windows feature)
+3. **Git for Windows**: `C:\Program Files\Git\usr\bin\ssh.exe` (Git installation)
+4. **Manual OpenSSH**: `C:\Program Files\OpenSSH\ssh.exe` (manual installation)
+5. **Fallback**: `ssh --version` (final attempt using PATH)
+
+#### Unix-like Systems Detection
+
+For Linux, macOS, and other Unix-like systems:
+
+1. **Standard detection**: `which ssh` command
+2. **Version verification**: `ssh --version` for validation
+
+### Implementation
+
+```typescript
+function checkSSHAvailable(): boolean {
+  try {
+    const { execSync } = require('child_process');
+    const os = require('os');
+    
+    if (os.platform() === 'win32') {
+      // Windows: Check multiple possible SSH locations
+      const possiblePaths = [
+        'ssh.exe',
+        'C:\\Windows\\System32\\OpenSSH\\ssh.exe',
+        'C:\\Program Files\\Git\\usr\\bin\\ssh.exe',
+        'C:\\Program Files\\OpenSSH\\ssh.exe'
+      ];
+      
+      for (const path of possiblePaths) {
+        try {
+          execSync(`${path} --version`, { stdio: 'ignore' });
+          return true;
+        } catch {
+          continue;
+        }
+      }
+      
+      // If none of the specific paths work, try 'ssh' (might be in PATH)
+      try {
+        execSync('ssh --version', { stdio: 'ignore' });
+        return true;
+      } catch {
+        return false;
+      }
+    } else {
+      // Unix-like systems: use 'which ssh'
+      execSync('which ssh', { stdio: 'ignore' });
+      return true;
+    }
+  } catch {
+    return false;
+  }
+}
+```
+
+### Benefits
+
+- **Cross-platform compatibility**: Works on Windows, Linux, and macOS
+- **Multiple installation support**: Detects SSH from various installation methods
+- **Graceful degradation**: Provides clear error messages when SSH is not found
+- **User guidance**: Offers installation instructions when SSH is missing
 
 ## Components and Interfaces
 
@@ -142,6 +228,7 @@ interface RemoteFileSystemProvider extends vscode.FileSystemProvider {
 **Purpose**: Manages remote terminal sessions and command execution
 
 **Key Interfaces**:
+
 ```typescript
 interface RemoteTerminalProvider {
   createTerminal(connection: SSHConnection, options?: TerminalOptions): Promise<RemoteTerminal>
@@ -188,6 +275,7 @@ interface SSHHostConfig {
 ## Data Models
 
 ### Connection State Model
+
 ```typescript
 interface ConnectionState {
   connectionId: string
@@ -236,29 +324,34 @@ interface TerminalSession {
 ## Error Handling
 
 ### Connection Errors
+
 - **Authentication Failures**: Provide clear error messages and retry mechanisms
 - **Network Timeouts**: Implement exponential backoff for reconnection attempts
 - **Host Unreachable**: Display network troubleshooting guidance
 - **Permission Denied**: Guide users through SSH key setup and file permissions
 
 ### File System Errors
+
 - **Permission Denied**: Show appropriate error messages and suggest solutions
 - **File Not Found**: Handle gracefully with user-friendly messages
 - **Disk Space**: Detect and report storage issues on remote host
 - **Network Interruption**: Queue operations and retry when connection is restored
 
 ### Terminal Errors
+
 - **Shell Initialization**: Handle cases where default shell is unavailable
 - **Command Execution**: Capture and display stderr appropriately
 - **Process Termination**: Clean up resources when processes exit unexpectedly
 
 ### Recovery Strategies
+
 - **Automatic Reconnection**: Attempt to reconnect with exponential backoff
 - **State Restoration**: Restore open files and terminal sessions after reconnection
 - **Graceful Degradation**: Continue working with cached data when possible
 - **User Notification**: Keep users informed of connection status and recovery attempts
 
 ### Module System Errors
+
 - **Activation Errors**: Handle module system incompatibility errors during extension activation
 - **Import/Export Errors**: Ensure proper module syntax is used throughout the codebase
 - **Dependency Compatibility**: Verify all dependencies work with the chosen module system
@@ -266,6 +359,7 @@ interface TerminalSession {
 ## Testing Strategy
 
 ### Unit Testing
+
 - **Connection Manager**: Mock SSH connections and test authentication flows
 - **File System Provider**: Test CRUD operations with mock SFTP clients
 - **Configuration Manager**: Test secure storage and retrieval of SSH configs
@@ -273,6 +367,7 @@ interface TerminalSession {
 - **Module Loading**: Verify that all modules can be loaded correctly with CommonJS
 
 ### Integration Testing
+
 - **End-to-End Workflows**: Test complete user journeys from connection to file editing
 - **Multi-Connection Scenarios**: Test handling of multiple simultaneous SSH connections
 - **Reconnection Logic**: Test automatic reconnection and state restoration
@@ -280,18 +375,21 @@ interface TerminalSession {
 - **Extension Activation**: Verify that the extension activates without module system errors
 
 ### Performance Testing
+
 - **File Transfer Performance**: Measure and optimize large file operations
 - **Connection Latency**: Test responsiveness with high-latency connections
 - **Memory Usage**: Monitor resource consumption with multiple connections
 - **Concurrent Operations**: Test performance with multiple simultaneous file operations
 
 ### Security Testing
+
 - **Credential Storage**: Verify secure handling of SSH keys and passwords
 - **Connection Security**: Ensure proper SSH protocol implementation
 - **Input Validation**: Test against malicious input and path traversal attacks
 - **Permission Handling**: Verify proper file system permission enforcement
 
 ### User Experience Testing
+
 - **Connection Setup**: Test ease of initial SSH configuration
 - **Error Messages**: Verify clarity and helpfulness of error messages
 - **Performance Perception**: Ensure responsive UI during remote operations
@@ -302,10 +400,12 @@ interface TerminalSession {
 ### Option 1: Rename extension.js to extension.cjs
 
 **Pros**:
+
 - Keeps ES modules for the rest of the codebase
 - Clear indication of which files use which module system
 
 **Cons**:
+
 - May require changes to build configuration
 - Potential for confusion with mixed module formats
 - May require additional changes to other files that interact with extension.js
@@ -313,10 +413,12 @@ interface TerminalSession {
 ### Option 2: Use Dynamic Import
 
 **Pros**:
+
 - Keeps ES modules for the codebase
 - Modern JavaScript approach
 
 **Cons**:
+
 - More complex implementation
 - May require significant changes to how VS Code loads the extension
 - Less standard approach for VS Code extensions

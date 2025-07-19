@@ -5,6 +5,17 @@ All notable changes to the SSH Remote Extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.9] - 2025-07-19
+
+### Fixed in 1.0.9
+
+- Fixed Windows SSH detection by implementing cross-platform SSH availability checking
+- Added support for multiple Windows SSH installation locations (Windows OpenSSH, Git for Windows, manual installations)
+- Improved SSH detection to check common Windows paths: System32\OpenSSH, Git usr\bin, Program Files\OpenSSH
+- Maintained backward compatibility with Unix-like systems using `which ssh` command
+- Enhanced error handling for SSH detection failures with clear user guidance
+- Updated SSH detection to use platform-specific logic for better cross-platform support
+
 ## [1.0.8] - 2025-07-19
 
 ### Fixed in 1.0.8
