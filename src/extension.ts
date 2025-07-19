@@ -110,6 +110,11 @@ export class SSHRemoteExtension {
       // Register commands using the command palette integration
       this.commandPaletteIntegration.registerCommands();
 
+      // Ensure the main command is registered directly as well for redundancy
+      this.context.subscriptions.push(
+        vscode.commands.registerCommand('remote-ssh.connect', () => this.extensionBridge.showHostSelection())
+      );
+
       // Load cached data
       await this.fileCache.loadFromDisk();
 

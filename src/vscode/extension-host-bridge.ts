@@ -53,7 +53,7 @@ export class ExtensionHostBridgeImpl implements ExtensionHostBridge {
     // Set up status bar
     this.statusBarItem.text = '$(server) SSH Remote';
     this.statusBarItem.tooltip = 'SSH Remote Extension';
-    this.statusBarItem.command = 'ssh-remote.showConnections';
+    this.statusBarItem.command = 'remote-ssh.showConnections';
     this.statusBarItem.show();
 
     // Register file system provider for SSH URIs
@@ -75,42 +75,42 @@ export class ExtensionHostBridgeImpl implements ExtensionHostBridge {
   private registerCommands(): void {
     // Connect to SSH host
     this.disposables.push(
-      vscode.commands.registerCommand('ssh-remote.connect', async () => {
+      vscode.commands.registerCommand('remote-ssh.connect', async () => {
         await this.showHostSelection();
       })
     );
 
     // Disconnect from SSH host
     this.disposables.push(
-      vscode.commands.registerCommand('ssh-remote.disconnect', async () => {
+      vscode.commands.registerCommand('remote-ssh.disconnect', async () => {
         await this.disconnectCurrentHost();
       })
     );
 
     // Show active connections
     this.disposables.push(
-      vscode.commands.registerCommand('ssh-remote.showConnections', () => {
+      vscode.commands.registerCommand('remote-ssh.showConnections', () => {
         this.showActiveConnections();
       })
     );
 
     // Open terminal
     this.disposables.push(
-      vscode.commands.registerCommand('ssh-remote.openTerminal', async () => {
+      vscode.commands.registerCommand('remote-ssh.openTerminal', async () => {
         await this.openTerminalForCurrentConnection();
       })
     );
 
     // Add new host
     this.disposables.push(
-      vscode.commands.registerCommand('ssh-remote.addHost', async () => {
+      vscode.commands.registerCommand('remote-ssh.addHost', async () => {
         await this.addNewHost();
       })
     );
 
     // Manage hosts
     this.disposables.push(
-      vscode.commands.registerCommand('ssh-remote.manageHosts', () => {
+      vscode.commands.registerCommand('remote-ssh.manageHosts', () => {
         this.showHostManagement();
       })
     );
