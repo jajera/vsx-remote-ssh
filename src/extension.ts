@@ -468,31 +468,69 @@ function checkSSHAvailable(): boolean {
         'ssh.exe',
         'C:\\Windows\\System32\\OpenSSH\\ssh.exe',
         'C:\\Program Files\\Git\\usr\\bin\\ssh.exe',
-        'C:\\Program Files\\OpenSSH\\ssh.exe'
+        'C:\\Program Files\\OpenSSH\\ssh.exe',
+        'C:\\Program Files (x86)\\Git\\usr\\bin\\ssh.exe',
+        'C:\\Program Files (x86)\\OpenSSH\\ssh.exe'
       ];
       
+      // First try the simple 'ssh' command (most common)
+      try {
+        execSync('ssh -V', { stdio: 'ignore', timeout: 5000 });
+        console.log('DEBUG: SSH found via PATH');
+        return true;
+      } catch (error) {
+        console.log('DEBUG: SSH not found in PATH, checking specific paths...');
+      }
+      
+      // Then check specific paths
       for (const path of possiblePaths) {
         try {
-          execSync(`${path} --version`, { stdio: 'ignore' });
+          execSync(`"${path}" -V`, { stdio: 'ignore', timeout: 5000 });
+          console.log(`DEBUG: SSH found at ${path}`);
           return true;
-        } catch {
+        } catch (error) {
+          console.log(`DEBUG: SSH not found at ${path}`);
           continue;
         }
       }
       
-      // If none of the specific paths work, try 'ssh' (might be in PATH)
+      // Try with where command (Windows equivalent of which)
       try {
-        execSync('ssh --version', { stdio: 'ignore' });
+        execSync('where ssh', { stdio: 'ignore', timeout: 5000 });
+        console.log('DEBUG: SSH found via where command');
         return true;
-      } catch {
-        return false;
+      } catch (error) {
+        console.log('DEBUG: SSH not found via where command');
       }
+      
+      // Try checking if SSH files exist directly
+      const fs = require('fs');
+      for (const path of possiblePaths) {
+        try {
+          if (fs.existsSync(path)) {
+            console.log(`DEBUG: SSH file exists at ${path}`);
+            return true;
+          }
+        } catch (error) {
+          console.log(`DEBUG: Could not check ${path}`);
+        }
+      }
+      
+      console.log('DEBUG: No SSH found on Windows');
+      return false;
     } else {
       // Unix-like systems: use 'which ssh'
-      execSync('which ssh', { stdio: 'ignore' });
-      return true;
+      try {
+        execSync('which ssh', { stdio: 'ignore', timeout: 5000 });
+        console.log('DEBUG: SSH found on Unix-like system');
+        return true;
+      } catch (error) {
+        console.log('DEBUG: SSH not found on Unix-like system');
+        return false;
+      }
     }
-  } catch {
+  } catch (error) {
+    console.log('DEBUG: SSH detection failed:', error);
     return false;
   }
 }
@@ -709,7 +747,22 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     if (sshAvailable) {
       vscode.window.showInformationMessage('SSH Extension activated with full functionality! All commands are now working.');
     } else {
-      vscode.window.showWarningMessage('SSH Extension activated but system SSH not found. Please install OpenSSH.');
+      const os = require('os');
+      if (os.platform() === 'win32') {
+        vscode.window.showWarningMessage(
+          'SSH Extension activated but SSH not found. Please install OpenSSH for Windows or Git for Windows.',
+          'Install OpenSSH',
+          'Install Git for Windows'
+        ).then(selection => {
+          if (selection === 'Install OpenSSH') {
+            vscode.env.openExternal(vscode.Uri.parse('https://docs.microsoft.com/en-us/windows-server/administration/openssh/openssh_install_firstuse'));
+          } else if (selection === 'Install Git for Windows') {
+            vscode.env.openExternal(vscode.Uri.parse('https://git-scm.com/download/win'));
+          }
+        });
+      } else {
+        vscode.window.showWarningMessage('SSH Extension activated but system SSH not found. Please install OpenSSH.');
+      }
     }
     
     // Show welcome message on first install
