@@ -81,8 +81,11 @@ export class CommandPaletteIntegration {
     
     // Utility commands
     this.registerCommand('remote-ssh.showHostInfo', this.showHostInfo.bind(this));
+    this.registerCommand('remote-ssh.showCacheStatistics', this.showCacheStatistics.bind(this));
     this.registerCommand('remote-ssh.clearCache', this.clearCache.bind(this));
     this.registerCommand('remote-ssh.showSettings', this.showSettings.bind(this));
+    this.registerCommand('remote-ssh.exportConfiguration', this.exportConfiguration.bind(this));
+    this.registerCommand('remote-ssh.importConfiguration', this.importConfiguration.bind(this));
   }
 
   /**
@@ -1036,5 +1039,63 @@ Connection Information:
     const performanceMonitor = PerformanceMonitor.getInstance();
     
     performanceMonitor.clearMetrics();
+  }
+
+  /**
+   * Show cache statistics
+   */
+  private async showCacheStatistics(): Promise<void> {
+    try {
+      // For now, show a simple message since cache stats might not be available
+      vscode.window.showInformationMessage('Cache statistics feature is being implemented');
+    } catch (error) {
+      vscode.window.showErrorMessage(`Failed to get cache statistics: ${error}`);
+    }
+  }
+
+  /**
+   * Export configuration
+   */
+  private async exportConfiguration(): Promise<void> {
+    try {
+      const config = this.configManager.exportConfiguration();
+      const uri = await vscode.window.showSaveDialog({
+        title: 'Export SSH Configuration',
+        filters: {
+          'JSON Files': ['json']
+        }
+      });
+      
+      if (uri) {
+        await vscode.workspace.fs.writeFile(uri, Buffer.from(JSON.stringify(config, null, 2)));
+        vscode.window.showInformationMessage('Configuration exported successfully');
+      }
+    } catch (error) {
+      vscode.window.showErrorMessage(`Failed to export configuration: ${error}`);
+    }
+  }
+
+  /**
+   * Import configuration
+   */
+  private async importConfiguration(): Promise<void> {
+    try {
+      const uris = await vscode.window.showOpenDialog({
+        title: 'Import SSH Configuration',
+        filters: {
+          'JSON Files': ['json']
+        },
+        canSelectMany: false
+      });
+      
+      if (uris && uris.length > 0) {
+        const content = await vscode.workspace.fs.readFile(uris[0]);
+        const config = JSON.parse(content.toString());
+        this.configManager.importConfiguration(config);
+        vscode.window.showInformationMessage('Configuration imported successfully');
+      }
+    } catch (error) {
+      vscode.window.showErrorMessage(`Failed to import configuration: ${error}`);
+    }
   }
 }
