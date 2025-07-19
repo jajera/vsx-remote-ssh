@@ -60,7 +60,7 @@ jobs:
             echo "NEW_VERSION=$CURRENT_VERSION" >> $GITHUB_OUTPUT
           fi
 
-      - name: Check Namespace Exists
+      - name: Check and Create Namespace
         if: steps.version_check.outputs.SHOULD_RELEASE == 'true'
         run: |
           echo "🔍 Checking if namespace exists in Open VSX Registry..."
@@ -68,17 +68,31 @@ jobs:
           # Install ovsx CLI
           npm install -g ovsx
           
-          # Check if namespace exists
-          if ovsx search --query "publisher:${{ github.repository_owner }}" | grep -q "${{ github.repository_owner }}"; then
+          # Check if namespace exists using Open VSX search API
+          SEARCH_RESULT=$(curl -s "https://open-vsx.org/api/-/search?query=${{ github.repository_owner }}" | jq -r '.totalSize // 0')
+          
+          if [ "$SEARCH_RESULT" -gt 0 ]; then
             echo "✅ Namespace '${{ github.repository_owner }}' already exists in Open VSX Registry"
             echo "NAMESPACE_EXISTS=true" >> $GITHUB_OUTPUT
           else
             echo "❌ Namespace '${{ github.repository_owner }}' does not exist in Open VSX Registry"
-            echo "NAMESPACE_EXISTS=false" >> $GITHUB_OUTPUT
-            echo ""
-            echo "🔧 To create the namespace, run the 'Create Open VSX Namespace' workflow first"
-            echo "Or manually run: ovsx create-namespace ${{ github.repository_owner }}"
+            echo "Creating namespace now..."
+            
+            # Create namespace using GitHub username
+            ovsx create-namespace ${{ github.repository_owner }}
+            
+            if [ $? -eq 0 ]; then
+              echo "✅ Namespace '${{ github.repository_owner }}' created successfully!"
+              echo "NAMESPACE_EXISTS=true" >> $GITHUB_OUTPUT
+            else
+              echo "❌ Failed to create namespace '${{ github.repository_owner }}'"
+              echo "Check your OVSX_PAT token and permissions"
+              echo "NAMESPACE_EXISTS=false" >> $GITHUB_OUTPUT
+              exit 1
+            fi
           fi
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
 
       - name: Verify Publisher and Extension Info
         if: steps.version_check.outputs.SHOULD_RELEASE == 'true'
