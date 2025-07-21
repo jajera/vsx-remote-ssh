@@ -19,6 +19,12 @@ export {
   TerminalState
 };
 
+// Mount interfaces
+export * from './mount';
+
+// Source control interfaces
+export * from './source-control';
+
 // Configuration interfaces
 export * from './configuration';
 

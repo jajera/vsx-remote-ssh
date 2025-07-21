@@ -8,9 +8,10 @@ This document provides detailed instructions on how to use the VSX Remote SSH Ex
 2. [Connecting to a Remote Host](#connecting-to-a-remote-host)
 3. [Managing SSH Hosts](#managing-ssh-hosts)
 4. [Working with Remote Files](#working-with-remote-files)
-5. [Using Remote Terminals](#using-remote-terminals)
-6. [Extension Compatibility](#extension-compatibility)
-7. [Troubleshooting](#troubleshooting)
+5. [Using Remote Folder Mounts](#using-remote-folder-mounts)
+6. [Using Remote Terminals](#using-remote-terminals)
+7. [Extension Compatibility](#extension-compatibility)
+8. [Troubleshooting](#troubleshooting)
 
 ## Installation
 
@@ -97,6 +98,61 @@ Once connected to a remote host, the Explorer view will show the remote file sys
 3. Enter the name of the file or folder
 4. For files, the new file will open in the editor
 
+## Using Remote Folder Mounts
+
+Remote folder mounting allows you to add specific remote folders to your workspace, making them easily accessible and providing optimized performance.
+
+### Mounting a Remote Folder
+
+1. Press `Ctrl+Shift+P` to open the Command Palette
+2. Type "Remote SSH: Mount Remote Folder" and select the command
+3. Select the SSH host you want to mount a folder from
+4. Enter the path to the remote folder you want to mount
+5. The folder will be added to your workspace and appear in the Explorer view
+
+### Managing Mounted Folders
+
+#### Via Command Palette
+
+1. Press `Ctrl+Shift+P` to open the Command Palette
+2. Type "Remote SSH: Unmount Remote Folder" to remove a mount
+3. Select the mounted folder you want to unmount
+
+#### Via Explorer Context Menu
+
+1. Right-click on a mounted folder in the Explorer view
+2. Select "Unmount Remote Folder" from the context menu
+
+### Mount Performance Optimization
+
+The extension automatically optimizes performance for mounted folders based on your usage patterns and network conditions.
+
+#### Viewing Mount Performance
+
+1. Press `Ctrl+Shift+P` to open the Command Palette
+2. Type "Remote SSH: Show Mount Performance Stats" and select the command
+3. A webview will open showing performance metrics for your mounted folders, including:
+   - Operation success rates
+   - Cache hit rates
+   - Network quality
+   - Data transfer statistics
+   - Usage patterns
+
+#### Optimizing Mount Performance
+
+1. Press `Ctrl+Shift+P` to open the Command Palette
+2. Type "Remote SSH: Optimize Mount Performance" and select the command
+3. The extension will analyze your usage patterns and network conditions
+4. Optimizations will be applied automatically, such as:
+   - Adjusting cache size and TTL
+   - Enabling/disabling prefetching
+   - Enabling/disabling compression
+   - Adapting to network conditions
+
+### Mount Persistence
+
+Mounted folders are automatically restored when you reopen VS Code, ensuring your workspace setup remains consistent.
+
 ## Using Remote Terminals
 
 ### Opening a Terminal
@@ -149,6 +205,33 @@ If you're experiencing slow performance:
 1. Check your network connection quality
 2. Consider using the file cache for frequently accessed files
 3. Monitor performance using the "Remote SSH: Show Performance Stats" command
+4. For mounted folders, use "Remote SSH: Show Mount Performance Stats" for detailed metrics
+5. Apply optimizations with "Remote SSH: Optimize Mount Performance"
+
+### Mount Issues
+
+If you're having trouble with mounted folders:
+
+1. **Mount fails to connect**: 
+   - Verify the remote path exists and you have permissions to access it
+   - Check that the SSH connection is active
+   - Try reconnecting to the host first, then mounting again
+
+2. **Slow mount performance**:
+   - Use "Remote SSH: Show Mount Performance Stats" to identify bottlenecks
+   - Consider mounting smaller, more specific folders instead of large directories
+   - Enable compression for slow network connections
+   - Adjust cache settings for frequently accessed files
+
+3. **Mount disconnects frequently**:
+   - Check your network stability
+   - Increase the reconnection timeout in settings
+   - Monitor network conditions with the performance stats view
+
+4. **Changes not syncing**:
+   - Ensure the file watcher is working correctly
+   - Try manually refreshing the explorer view
+   - Check for file permission issues on the remote server
 
 ### Getting Help
 

@@ -428,7 +428,7 @@ export class ReconnectionHandlerImpl implements ReconnectionHandler {
         console.log(`Successfully reconnected to ${connection.config.host}`);
         
         // Show success notification
-        vscode.window.showInformationMessage(
+          vscode.window.showInformationMessage(
           `Successfully reconnected to ${connection.config.host}`
         );
         
@@ -528,8 +528,8 @@ export class ReconnectionHandlerImpl implements ReconnectionHandler {
   } finally {
     // Always remove from active reconnections
     this.activeReconnections.delete(connection.id);
+    }
   }
-}
   
   /**
    * Handles SSH errors and determines if reconnection should be attempted

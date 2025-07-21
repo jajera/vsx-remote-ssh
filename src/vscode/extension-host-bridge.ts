@@ -2,9 +2,13 @@ import * as vscode from 'vscode';
 import { SSHConnectionManagerImpl } from '../ssh/connection-manager';
 import { RemoteFileSystemProviderImpl } from '../ssh/remote-file-system-provider';
 import { RemoteTerminalProviderImpl } from '../ssh/remote-terminal-provider';
+import { MountTerminalProviderImpl } from '../ssh/mount-terminal-provider';
+import { MountSourceControlProviderImpl } from '../ssh/mount-source-control-provider';
 import { ConfigurationManager } from '../config/configuration-manager';
 import { RemoteFileCache } from '../ssh/remote-file-cache';
 import { SSHHostConfig, SSHConfig, ConnectionStatus } from '../interfaces/ssh';
+import { MountManager, MountTerminalOptions } from '../interfaces/mount';
+import { MountSourceControlProvider } from '../interfaces/source-control';
 import { HostConfigurationUI } from '../config/host-configuration-ui';
 
 export interface ExtensionHostBridge {
@@ -12,6 +16,11 @@ export interface ExtensionHostBridge {
   registerFileSystemProvider(connectionId: string, provider: RemoteFileSystemProviderImpl): void;
   unregisterFileSystemProvider(connectionId: string): void;
   createTerminal(connectionId: string, options?: any): Promise<vscode.Terminal>;
+  createTerminalForMount(mountId: string, options?: MountTerminalOptions): Promise<vscode.Terminal>;
+  openTerminalInCurrentWorkspaceFolder(): Promise<vscode.Terminal | undefined>;
+  initializeSourceControlForMount(mountId: string): Promise<vscode.SourceControl>;
+  executeGitCommand(mountId: string, command: string, ...args: string[]): Promise<{ stdout: string; stderr: string; exitCode: number }>;
+  refreshSourceControl(mountId: string): Promise<void>;
   updateStatusBar(connectionId: string, status: ConnectionStatus): void;
   showNotification(message: string, type: 'info' | 'warning' | 'error'): void;
   showInputBox(prompt: string, password?: boolean): Promise<string | undefined>;
@@ -26,6 +35,9 @@ export class ExtensionHostBridgeImpl implements ExtensionHostBridge {
   private configManager: ConfigurationManager;
   private fileCache: RemoteFileCache;
   private terminalProvider: RemoteTerminalProviderImpl;
+  private mountTerminalProvider: MountTerminalProviderImpl | undefined;
+  private mountSourceControlProvider: MountSourceControlProviderImpl | undefined;
+  private mountManager: MountManager | undefined;
   private hostConfigUI: HostConfigurationUI;
   private statusBarItem: vscode.StatusBarItem;
   private fileSystemProviders: Map<string, vscode.FileSystemProvider> = new Map();
@@ -237,15 +249,172 @@ export class ExtensionHostBridgeImpl implements ExtensionHostBridge {
     vscode.window.showInformationMessage(`Active connections:\n${message}`);
   }
 
-  async openTerminalForCurrentConnection(): Promise<void> {
+  async openTerminalForCurrentConnection(): Promise<vscode.Terminal | undefined> {
     const activeConnections = this.connectionManager.getActiveConnections();
+    
     if (activeConnections.length === 0) {
-      this.showNotification('No active SSH connections', 'warning');
-      return;
+      this.showNotification('No active SSH connection', 'warning');
+      return undefined;
     }
-
-    const connection = activeConnections[0];
-    await this.createTerminal(connection.id);
+    
+    try {
+      const connection = activeConnections[0];
+      const terminal = await this.createTerminal(connection.id);
+      terminal.show();
+      return terminal;
+    } catch (error) {
+      this.showNotification(`Failed to open terminal: ${error}`, 'error');
+      return undefined;
+    }
+  }
+  
+  /**
+   * Set the mount manager for terminal integration with mounted folders
+   * @param mountManager The mount manager instance
+   */
+  setMountManager(mountManager: MountManager): void {
+    this.mountManager = mountManager;
+    
+    // Initialize the mount terminal provider if we have both dependencies
+    if (this.mountManager && this.terminalProvider) {
+      this.mountTerminalProvider = new MountTerminalProviderImpl(
+        this.terminalProvider,
+        this.mountManager
+      );
+    }
+    
+    // Initialize the mount source control provider
+    if (this.mountManager) {
+      this.mountSourceControlProvider = new MountSourceControlProviderImpl(
+        this.mountManager
+      );
+    }
+  }
+  
+  /**
+   * Initialize source control for a mount point
+   * @param mountId The ID of the mount point
+   * @returns The source control instance
+   */
+  async initializeSourceControlForMount(mountId: string): Promise<vscode.SourceControl> {
+    if (!this.mountSourceControlProvider || !this.mountManager) {
+      throw new Error('Mount source control provider not initialized. Mount manager must be set first.');
+    }
+    
+    const mountPoint = this.mountManager.getMountById(mountId);
+    if (!mountPoint) {
+      throw new Error(`Mount point with ID ${mountId} not found`);
+    }
+    
+    try {
+      const sourceControl = await this.mountSourceControlProvider.initializeSourceControl(mountPoint);
+      return sourceControl;
+    } catch (error) {
+      this.showNotification(`Failed to initialize source control for mount: ${error}`, 'error');
+      throw error;
+    }
+  }
+  
+  /**
+   * Execute a Git command on a mounted folder
+   * @param mountId The ID of the mount point
+   * @param command The Git command to execute
+   * @param args The arguments for the Git command
+   * @returns The result of the command execution
+   */
+  async executeGitCommand(
+    mountId: string, 
+    command: string, 
+    ...args: string[]
+  ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+    if (!this.mountSourceControlProvider || !this.mountManager) {
+      throw new Error('Mount source control provider not initialized. Mount manager must be set first.');
+    }
+    
+    const mountPoint = this.mountManager.getMountById(mountId);
+    if (!mountPoint) {
+      throw new Error(`Mount point with ID ${mountId} not found`);
+    }
+    
+    try {
+      return await this.mountSourceControlProvider.executeGitCommand(mountId, command, ...args);
+    } catch (error) {
+      this.showNotification(`Failed to execute Git command: ${error}`, 'error');
+      throw error;
+    }
+  }
+  
+  /**
+   * Refresh the source control status for a mount point
+   * @param mountId The ID of the mount point
+   */
+  async refreshSourceControl(mountId: string): Promise<void> {
+    if (!this.mountSourceControlProvider || !this.mountManager) {
+      throw new Error('Mount source control provider not initialized. Mount manager must be set first.');
+    }
+    
+    const mountPoint = this.mountManager.getMountById(mountId);
+    if (!mountPoint) {
+      throw new Error(`Mount point with ID ${mountId} not found`);
+    }
+    
+    try {
+      await this.mountSourceControlProvider.refreshSourceControl(mountId);
+    } catch (error) {
+      this.showNotification(`Failed to refresh source control: ${error}`, 'error');
+      throw error;
+    }
+  }
+  
+  /**
+   * Create a terminal for a mounted folder
+   * @param mountId The ID of the mount point
+   * @param options Terminal options
+   * @returns A new VS Code terminal
+   */
+  async createTerminalForMount(mountId: string, options?: MountTerminalOptions): Promise<vscode.Terminal> {
+    if (!this.mountTerminalProvider || !this.mountManager) {
+      throw new Error('Mount terminal provider not initialized. Mount manager must be set first.');
+    }
+    
+    const mountPoint = this.mountManager.getMountById(mountId);
+    if (!mountPoint) {
+      throw new Error(`Mount point with ID ${mountId} not found`);
+    }
+    
+    try {
+      const terminal = await this.mountTerminalProvider.createTerminalForMount(mountId, options);
+      terminal.show();
+      return terminal;
+    } catch (error) {
+      this.showNotification(`Failed to create terminal for mount: ${error}`, 'error');
+      throw error;
+    }
+  }
+  
+  /**
+   * Open a terminal in the current workspace folder if it's a mounted folder
+   * @returns A new terminal or undefined if the current folder is not a mounted folder
+   */
+  async openTerminalInCurrentWorkspaceFolder(): Promise<vscode.Terminal | undefined> {
+    if (!this.mountTerminalProvider) {
+      this.showNotification('Mount terminal provider not initialized', 'warning');
+      return undefined;
+    }
+    
+    try {
+      const terminal = await this.mountTerminalProvider.openTerminalInCurrentWorkspaceFolder();
+      if (terminal) {
+        terminal.show();
+        return terminal;
+      } else {
+        // If no mount was found for the current folder, fall back to regular SSH terminal
+        return this.openTerminalForCurrentConnection();
+      }
+    } catch (error) {
+      this.showNotification(`Failed to open terminal in current folder: ${error}`, 'warning');
+      return undefined;
+    }
   }
 
   async addNewHost(): Promise<void> {

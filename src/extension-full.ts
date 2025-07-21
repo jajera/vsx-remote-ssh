@@ -14,6 +14,8 @@ import { ExtensionHostBridgeExtension } from './vscode/extension-host-bridge-ext
 import { SSHErrorClassifier } from './ssh/error-classifier';
 import { ConnectionStateManagerImpl } from './ssh/connection-state-manager';
 import { CommandPaletteIntegration } from './vscode/command-palette-integration';
+import { MountTerminalCommands } from './vscode/mount-terminal-commands';
+import { MountSourceControlCommands } from './vscode/mount-source-control-commands';
 import { WorkspaceContextManager } from './vscode/workspace-context-manager';
 import { NotificationService, NotificationLevel } from './vscode/notification-service';
 import { PerformanceMonitor } from './ssh/performance-monitor';
@@ -31,6 +33,8 @@ export class SSHRemoteExtension {
   private errorClassifier: SSHErrorClassifier;
   private stateManager: ConnectionStateManagerImpl;
   private commandPaletteIntegration: CommandPaletteIntegration;
+  private mountTerminalCommands: MountTerminalCommands | undefined;
+  private mountSourceControlCommands: MountSourceControlCommands | undefined;
   private workspaceContextManager: WorkspaceContextManager;
   private notificationService: NotificationService;
   private performanceMonitor: PerformanceMonitor;
@@ -119,6 +123,14 @@ export class SSHRemoteExtension {
       this.commandPaletteIntegration.registerCommands();
       console.log('DEBUG: Commands registered');
 
+      // Initialize mount terminal commands if a mount manager is available
+      this.initializeMountTerminalCommands();
+      console.log('DEBUG: Mount terminal commands initialized');
+      
+      // Initialize mount source control commands if a mount manager is available
+      this.initializeMountSourceControlCommands();
+      console.log('DEBUG: Mount source control commands initialized');
+
       // Load cached data
       await this.fileCache.loadFromDisk();
       console.log('DEBUG: Cache loaded');
@@ -138,6 +150,68 @@ export class SSHRemoteExtension {
       throw error;
     }
   }
+  
+  /**
+   * Initialize mount terminal commands if a mount manager is available
+   */
+  private initializeMountTerminalCommands(): void {
+    try {
+      // Check if we have a mount manager available
+      // This would typically be initialized elsewhere when the mount functionality is set up
+      const mountManager = (this as any).mountManager;
+      
+      if (mountManager) {
+        // Initialize mount terminal commands
+        this.mountTerminalCommands = new MountTerminalCommands(
+          this.extensionBridge,
+          mountManager
+        );
+        
+        // Register mount terminal commands
+        this.mountTerminalCommands.registerCommands();
+        console.log('DEBUG: Mount terminal commands registered');
+      } else {
+        console.log('DEBUG: Mount manager not available, skipping mount terminal commands initialization');
+      }
+    } catch (error) {
+      console.error('Failed to initialize mount terminal commands:', error);
+    }
+  }
+  
+  /**
+   * Initialize mount source control commands if a mount manager is available
+   */
+  private initializeMountSourceControlCommands(): void {
+    try {
+      // Check if we have a mount manager available
+      // This would typically be initialized elsewhere when the mount functionality is set up
+      const mountManager = (this as any).mountManager;
+      
+      if (mountManager) {
+        // Get the source control provider from the extension bridge
+        const sourceControlProvider = (this.extensionBridge as any).mountSourceControlProvider;
+        
+        if (sourceControlProvider) {
+          // Initialize mount source control commands
+          this.mountSourceControlCommands = new MountSourceControlCommands(
+            this.extensionBridge,
+            mountManager,
+            sourceControlProvider
+          );
+          
+          // Register mount source control commands
+          this.mountSourceControlCommands.registerCommands();
+          console.log('DEBUG: Mount source control commands registered');
+        } else {
+          console.log('DEBUG: Source control provider not available, skipping mount source control commands initialization');
+        }
+      } else {
+        console.log('DEBUG: Mount manager not available, skipping mount source control commands initialization');
+      }
+    } catch (error) {
+      console.error('Failed to initialize mount source control commands:', error);
+    }
+  }
 
   /**
    * Deactivate the extension
@@ -151,6 +225,12 @@ export class SSHRemoteExtension {
       this.extensionBridge.dispose();
       this.extensionBridgeExt.dispose();
       this.commandPaletteIntegration.dispose();
+      if (this.mountTerminalCommands) {
+        this.mountTerminalCommands.dispose();
+      }
+      if (this.mountSourceControlCommands) {
+        this.mountSourceControlCommands.dispose();
+      }
       this.workspaceContextManager.dispose();
       this.notificationService.dispose();
       this.performanceMonitor.dispose();
@@ -220,4 +300,4 @@ export class SSHRemoteExtension {
   getExtensionBridgeExtension(): ExtensionHostBridgeExtension {
     return this.extensionBridgeExt;
   }
-} 
+}

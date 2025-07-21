@@ -23,6 +23,14 @@ Connect to and develop on remote servers via SSH with full VS Code integration.
 - Large file handling
 - Binary file support
 
+### 📂 Remote Folder Mounting
+
+- Mount remote folders as workspace folders
+- Seamless integration with VS Code explorer
+- Persistent mount configurations
+- Automatic reconnection of mounted folders
+- Performance optimization for mounted folders
+
 ### 🖥️ Integrated Terminal
 
 - SSH terminal integration
@@ -36,6 +44,7 @@ Connect to and develop on remote servers via SSH with full VS Code integration.
 - Memory usage monitoring
 - Performance statistics
 - Resource usage alerts
+- Mount-specific performance optimization
 
 ### 🗂️ Workspace Management
 
@@ -83,6 +92,10 @@ Connect to and develop on remote servers via SSH with full VS Code integration.
 | `Remote SSH: Reconnect` | Reconnect to current host |
 | `Remote SSH: Open Remote Terminal` | Open SSH terminal |
 | `Remote SSH: Open Remote Workspace` | Open workspace on remote host |
+| `Remote SSH: Mount Remote Folder` | Mount a remote folder as workspace folder |
+| `Remote SSH: Unmount Remote Folder` | Remove a mounted remote folder |
+| `Remote SSH: Show Mount Performance Stats` | View performance metrics for mounted folders |
+| `Remote SSH: Optimize Mount Performance` | Apply performance optimizations to mounted folders |
 | `Remote SSH: Show Active Connections` | View active SSH connections |
 | `Remote SSH: Manage SSH Hosts` | Manage host configurations |
 | `Remote SSH: Test Connection` | Test SSH connection |
@@ -129,7 +142,13 @@ Connect to and develop on remote servers via SSH with full VS Code integration.
 {
   "remote-ssh.defaultPort": 22,
   "remote-ssh.connectTimeout": 15000,
-  "remote-ssh.reconnectAttempts": 3
+  "remote-ssh.reconnectAttempts": 3,
+  "remote-ssh.mount.cacheSize": 50,
+  "remote-ssh.mount.cacheTTL": 300000,
+  "remote-ssh.mount.prefetchEnabled": false,
+  "remote-ssh.mount.compressionEnabled": false,
+  "remote-ssh.mount.autoReconnect": true,
+  "remote-ssh.mount.watchExcludePatterns": ["**/node_modules/**", "**/.git/**"]
 }
 ```
 
@@ -163,6 +182,15 @@ Connect to and develop on remote servers via SSH with full VS Code integration.
 - **Memory Usage**: Monitor memory consumption
 - **Performance Stats**: Detailed performance metrics
 - **Resource Alerts**: Get notified of resource issues
+
+### Remote Folder Mount Features
+
+- **Folder Mounting**: Mount remote folders as workspace folders
+- **Explorer Integration**: Seamless integration with VS Code explorer
+- **Mount Persistence**: Automatic restoration of mounts on startup
+- **Performance Optimization**: Adaptive caching based on usage patterns
+- **Network Adaptation**: Automatic adjustment to network conditions
+- **Mount Management**: Easy-to-use commands for mount operations
 
 ### Workspace Management
 
@@ -262,6 +290,32 @@ Remote SSH: Show Cache Statistics
 → View connection metrics
 ```
 
+### Remote Folder Mount Workflow
+
+```bash
+# 1. Connect to your server
+Remote SSH: Connect to Host via SSH
+→ Select: Development Server
+
+# 2. Mount a specific project folder
+Remote SSH: Mount Remote Folder
+→ Path: /home/developer/projects/api-service
+
+# 3. Mount another related folder
+Remote SSH: Mount Remote Folder
+→ Path: /var/log/api-service
+
+# 4. Work with both folders in the same workspace
+# Edit code in the project folder while monitoring logs
+
+# 5. Optimize performance for slow connections
+Remote SSH: Show Mount Performance Stats
+→ View current performance metrics
+
+Remote SSH: Optimize Mount Performance
+→ Apply automatic optimizations based on usage patterns
+```
+
 ## Troubleshooting
 
 ### Connection Issues
@@ -284,11 +338,21 @@ Remote SSH: Show Cache Statistics
 - **"File not found"**: Verify remote path exists
 - **"Disk space"**: Check available disk space on server
 
+### Mount Issues
+
+- **"Failed to mount folder"**: Verify the remote path exists and you have permissions
+- **"Mount disconnected"**: Check network connection and try reconnecting
+- **"Slow mount performance"**: Use the Mount Performance Stats to identify bottlenecks
+- **"Changes not syncing"**: Check file watchers and try manually refreshing
+- **"High resource usage"**: Adjust cache settings or mount smaller directories
+
 ## Support
 
 ### Getting Help
 
 - **Documentation**: [GitHub Wiki](https://github.com/jajera/vsx-remote-ssh/wiki)
+- **Usage Guide**: [USAGE.md](docs/USAGE.md)
+- **Mount Troubleshooting**: [MOUNT_TROUBLESHOOTING.md](docs/MOUNT_TROUBLESHOOTING.md)
 - **Issues**: [GitHub Issues](https://github.com/jajera/vsx-remote-ssh/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/jajera/vsx-remote-ssh/discussions)
 

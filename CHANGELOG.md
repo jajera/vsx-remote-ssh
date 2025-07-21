@@ -5,6 +5,61 @@ All notable changes to the SSH Remote Extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2025-07-20
+
+### Added in 1.1.0
+
+- **Remote Folder Mount**: New feature to mount remote folders as workspace folders
+  - Mount any remote folder as a workspace folder with full VS Code integration
+  - Seamless integration with VS Code explorer and features
+  - Automatic restoration of mounts on startup
+  - Context menu integration for mount operations
+  - Status bar integration showing mount status
+
+- **Mount Management**:
+  - New command: `Remote SSH: Mount Remote Folder` to add remote folders to workspace
+  - New command: `Remote SSH: Unmount Remote Folder` to remove mounted folders
+  - Explorer context menu integration for mount operations
+  - Automatic reconnection of mounted folders when connection is lost
+  - Persistent mount configurations across VS Code sessions
+
+- **Mount Performance Monitoring**:
+  - New command: `Remote SSH: Show Mount Performance Stats` for detailed metrics
+  - Real-time performance metrics for mounted folders
+  - Network quality monitoring and classification
+  - Usage pattern analysis for optimization recommendations
+  - Visual performance reports with actionable insights
+
+- **Adaptive Caching and Optimization**:
+  - New command: `Remote SSH: Optimize Mount Performance` for automatic optimization
+  - Intelligent caching based on usage patterns
+  - Network condition detection and adaptation
+  - Automatic adjustment of cache size and TTL
+  - Prefetching for frequently accessed directories
+  - Compression for slow network connections
+
+- **VS Code Feature Integration**:
+  - Full search integration for mounted folders
+  - Source control support for Git repositories in mounted folders
+  - Terminal integration with automatic path resolution
+  - Debug support for mounted projects
+  - Extension host compatibility for language servers
+
+- **Error Handling and Troubleshooting**:
+  - User-friendly error messages for mount operations
+  - Detailed troubleshooting guidance for common issues
+  - Comprehensive error recovery options
+  - New troubleshooting guide: [MOUNT_TROUBLESHOOTING.md](docs/MOUNT_TROUBLESHOOTING.md)
+
+- **Configuration Options**:
+  - New settings for controlling mount behavior:
+    - `remote-ssh.mount.cacheSize`: Control cache size for mounted folders
+    - `remote-ssh.mount.cacheTTL`: Set time-to-live for cached content
+    - `remote-ssh.mount.prefetchEnabled`: Enable/disable directory prefetching
+    - `remote-ssh.mount.compressionEnabled`: Enable/disable data compression
+    - `remote-ssh.mount.autoReconnect`: Control automatic reconnection
+    - `remote-ssh.mount.watchExcludePatterns`: Exclude patterns for file watching
+
 ## [1.0.9] - 2025-07-19
 
 ### Fixed in 1.0.9
@@ -136,7 +191,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version History
 
-- **1.0.0**: Initial production-ready release with full feature set
+- **1.1.0**: Added Remote Folder Mount feature with performance monitoring and optimization
+- **1.0.9**: Fixed Windows SSH detection and cross-platform compatibility
+- **1.0.8**: Updated icon and status badges
+- **1.0.7**: Fixed module system compatibility issues
+- **1.0.6**: Fixed dependency bundling and module loading
+- **1.0.4**: Initial production-ready release with full feature set
 
 ## Migration Guide
 

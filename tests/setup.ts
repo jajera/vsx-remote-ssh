@@ -1,5 +1,10 @@
 // Test setup file for vitest
 import { vi } from 'vitest';
+import * as chai from 'chai';
+import sinonChai from 'chai-sinon';
+
+// Set up chai with sinon plugin
+chai.use(sinonChai);
 
 // Mock console methods to reduce noise in tests
 global.console = {
