@@ -15,11 +15,13 @@ This document provides solutions for common issues you might encounter when usin
 ### Mount Fails to Connect
 
 **Symptoms:**
+
 - Error message: "Failed to mount folder"
 - Mount appears in workspace but shows as disconnected
 - Files cannot be accessed
 
 **Solutions:**
+
 1. **Verify the remote path exists**
    - Check that the path you're trying to mount exists on the remote server
    - Ensure you have permissions to access the directory
@@ -38,11 +40,13 @@ This document provides solutions for common issues you might encounter when usin
 ### Mount Disconnects Frequently
 
 **Symptoms:**
+
 - Mount shows as disconnected intermittently
 - Operations fail with connection errors
 - Explorer shows "Reconnecting..." status
 
 **Solutions:**
+
 1. **Check network stability**
    - Verify your network connection is stable
    - Check for high latency or packet loss
@@ -50,11 +54,14 @@ This document provides solutions for common issues you might encounter when usin
 
 2. **Adjust reconnection settings**
    - Increase the reconnection timeout in settings:
+
      ```json
      "remote-ssh.reconnectTimeout": 30000,
      "remote-ssh.reconnectAttempts": 5
      ```
+
    - Enable aggressive reconnection for unstable networks:
+
      ```json
      "remote-ssh.mount.aggressiveReconnect": true
      ```
@@ -63,6 +70,7 @@ This document provides solutions for common issues you might encounter when usin
    - Use `Remote SSH: Show Mount Performance Stats` to view network quality
    - Check the "Network Conditions" section for issues
    - Consider enabling compression for poor network conditions:
+
      ```json
      "remote-ssh.mount.compressionEnabled": true
      ```
@@ -72,11 +80,13 @@ This document provides solutions for common issues you might encounter when usin
 ### Slow File Operations
 
 **Symptoms:**
+
 - File operations take longer than expected
 - High latency when opening or saving files
 - Explorer is slow to display directory contents
 
 **Solutions:**
+
 1. **Check mount performance metrics**
    - Use `Remote SSH: Show Mount Performance Stats` to identify bottlenecks
    - Look for low cache hit rates or high network latency
@@ -84,10 +94,13 @@ This document provides solutions for common issues you might encounter when usin
 
 2. **Optimize cache settings**
    - Increase cache size for frequently accessed folders:
+
      ```json
      "remote-ssh.mount.cacheSize": 100
      ```
+
    - Increase cache TTL for more stable content:
+
      ```json
      "remote-ssh.mount.cacheTTL": 600000
      ```
@@ -95,6 +108,7 @@ This document provides solutions for common issues you might encounter when usin
 3. **Enable prefetching for frequently accessed directories**
    - Use `Remote SSH: Optimize Mount Performance` to automatically enable prefetching
    - Or manually enable it in settings:
+
      ```json
      "remote-ssh.mount.prefetchEnabled": true,
      "remote-ssh.mount.prefetchDepth": 2
@@ -107,19 +121,23 @@ This document provides solutions for common issues you might encounter when usin
 ### High Latency
 
 **Symptoms:**
+
 - Operations feel sluggish
 - Long delay between action and response
 - Status bar shows high latency values
 
 **Solutions:**
+
 1. **Enable compression**
    - Turn on compression to reduce data transfer size:
+
      ```json
      "remote-ssh.mount.compressionEnabled": true
      ```
 
 2. **Optimize file watching**
    - Exclude unnecessary directories from file watching:
+
      ```json
      "remote-ssh.mount.watchExcludePatterns": [
        "**/node_modules/**",
@@ -131,6 +149,7 @@ This document provides solutions for common issues you might encounter when usin
 
 3. **Use batch operations**
    - Enable operation batching to reduce round-trips:
+
      ```json
      "remote-ssh.mount.batchOperations": true
      ```
@@ -140,17 +159,22 @@ This document provides solutions for common issues you might encounter when usin
 ### Changes Not Syncing
 
 **Symptoms:**
+
 - Local changes not appearing on remote server
 - Remote changes not reflecting in VS Code
 - File content appears outdated
 
 **Solutions:**
+
 1. **Check file watchers**
    - Ensure file watching is enabled:
+
      ```json
      "remote-ssh.mount.fileWatchingEnabled": true
      ```
+
    - Try increasing the polling interval for unreliable connections:
+
      ```json
      "remote-ssh.mount.fileWatchingPollingInterval": 5000
      ```
@@ -167,11 +191,13 @@ This document provides solutions for common issues you might encounter when usin
 ### Conflicts Between Local and Remote Changes
 
 **Symptoms:**
+
 - Error messages about conflicting changes
 - Files showing as modified on both sides
 - Unable to save changes
 
 **Solutions:**
+
 1. **Use the conflict resolution dialog**
    - When prompted, choose whether to keep local or remote changes
    - Consider using "Compare" to see the differences before deciding
@@ -179,12 +205,14 @@ This document provides solutions for common issues you might encounter when usin
 2. **Disable concurrent editing**
    - If multiple users are editing the same files, consider using a source control system
    - Or enable file locking:
+
      ```json
      "remote-ssh.mount.fileLockingEnabled": true
      ```
 
 3. **Increase synchronization frequency**
    - Decrease the sync interval to catch changes more quickly:
+
      ```json
      "remote-ssh.mount.syncInterval": 1000
      ```
@@ -194,6 +222,7 @@ This document provides solutions for common issues you might encounter when usin
 ### "Failed to Mount Folder"
 
 **Possible causes and solutions:**
+
 1. **Path doesn't exist**
    - Verify the path exists on the remote server
    - Create the directory if needed
@@ -209,8 +238,10 @@ This document provides solutions for common issues you might encounter when usin
 ### "Mount Operation Timed Out"
 
 **Possible causes and solutions:**
+
 1. **Slow network connection**
    - Increase operation timeout:
+
      ```json
      "remote-ssh.mount.operationTimeout": 60000
      ```
@@ -218,6 +249,7 @@ This document provides solutions for common issues you might encounter when usin
 2. **Large directory structure**
    - Mount a more specific subdirectory
    - Increase initial mount timeout:
+
      ```json
      "remote-ssh.mount.initialMountTimeout": 120000
      ```
@@ -229,12 +261,16 @@ This document provides solutions for common issues you might encounter when usin
 ### "File Watch Error"
 
 **Possible causes and solutions:**
+
 1. **Too many files being watched**
    - Exclude unnecessary directories:
+
      ```json
      "remote-ssh.mount.watchExcludePatterns": ["**/node_modules/**"]
      ```
+
    - Increase the watch limit:
+
      ```json
      "remote-ssh.mount.maxWatchedFiles": 10000
      ```
@@ -242,6 +278,7 @@ This document provides solutions for common issues you might encounter when usin
 2. **Server file watch limitations**
    - Some servers limit the number of inotify watches
    - Consider increasing server limits or using polling:
+
      ```json
      "remote-ssh.mount.usePolling": true
      ```
@@ -251,23 +288,27 @@ This document provides solutions for common issues you might encounter when usin
 ### High CPU Usage
 
 **Symptoms:**
+
 - VS Code becomes sluggish
 - High CPU usage reported by task manager
 - Fan noise increases on your computer
 
 **Solutions:**
+
 1. **Reduce file watching scope**
    - Exclude large directories from watching
    - Decrease watch polling frequency
 
 2. **Limit concurrent operations**
    - Set a lower limit for concurrent operations:
+
      ```json
      "remote-ssh.mount.maxConcurrentOperations": 4
      ```
 
 3. **Disable automatic prefetching**
    - Turn off prefetching if it's causing high CPU usage:
+
      ```json
      "remote-ssh.mount.prefetchEnabled": false
      ```
@@ -275,23 +316,29 @@ This document provides solutions for common issues you might encounter when usin
 ### High Memory Usage
 
 **Symptoms:**
+
 - VS Code memory usage grows over time
 - Performance degrades after extended use
 - Out of memory errors
 
 **Solutions:**
+
 1. **Limit cache size**
    - Reduce the maximum cache size:
+
      ```json
      "remote-ssh.mount.cacheSize": 25
      ```
 
 2. **Enable aggressive cache cleanup**
    - Set a lower cache TTL:
+
      ```json
      "remote-ssh.mount.cacheTTL": 120000
      ```
+
    - Enable aggressive cache cleanup:
+
      ```json
      "remote-ssh.mount.aggressiveCacheCleanup": true
      ```
@@ -303,13 +350,16 @@ This document provides solutions for common issues you might encounter when usin
 ### Network Bandwidth Issues
 
 **Symptoms:**
+
 - Other applications experience slow internet
 - Large amount of data being transferred
 - Network monitoring shows high usage
 
 **Solutions:**
+
 1. **Enable compression**
    - Turn on compression to reduce data transfer:
+
      ```json
      "remote-ssh.mount.compressionEnabled": true,
      "remote-ssh.mount.compressionLevel": 6
@@ -317,12 +367,14 @@ This document provides solutions for common issues you might encounter when usin
 
 2. **Limit background operations**
    - Reduce background synchronization:
+
      ```json
      "remote-ssh.mount.backgroundSyncEnabled": false
      ```
 
 3. **Set bandwidth limits**
    - Limit the maximum bandwidth usage:
+
      ```json
      "remote-ssh.mount.maxBandwidth": 1048576
      ```
@@ -333,10 +385,12 @@ For persistent issues that aren't resolved by the solutions above:
 
 1. **Enable diagnostic logging**
    - Set logging level to verbose:
+
      ```json
      "remote-ssh.logLevel": "trace",
      "remote-ssh.mount.logLevel": "debug"
      ```
+
    - Check the logs in the Output panel (View > Output > SSH Remote)
 
 2. **Check server-side logs**
