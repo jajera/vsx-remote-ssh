@@ -2,7 +2,7 @@
   "name": "vsx-remote-ssh",
   "displayName": "Remote SSH",
   "description": "Connect to and develop on remote servers via SSH",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "publisher": "jajera",
   "repository": {
     "type": "git",
@@ -356,7 +356,7 @@
     "markdownlint-cli": "^0.45.0",
     "rimraf": "^5.0.1",
     "sinon": "^21.0.0",
-    "sinon-chai": "^4.0.0",
+    "sinon-chai": "^3.7.0",
     "ts-node": "^10.9.1",
     "typedoc": "^0.26.0",
     "typescript": "^5.4.5",
