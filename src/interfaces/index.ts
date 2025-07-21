@@ -22,9 +22,12 @@ export {
 // Mount interfaces
 export * from './mount';
 
+<<<<<<< HEAD
 // Source control interfaces
 export * from './source-control';
 
+=======
+>>>>>>> 3679f3c (feat: add remote folder mount feature)
 // Configuration interfaces
 export * from './configuration';
 

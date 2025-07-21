@@ -527,7 +527,7 @@ export class CommandPaletteIntegration {
     }
 
     // Create quick pick items for each context
-    const items = contexts.map(ctx => {
+    const items = contexts.map((ctx: any) => {
       const connection = this.connectionManager.getConnection(ctx.connectionId);
       return {
         label: ctx.name,
@@ -604,9 +604,9 @@ export class CommandPaletteIntegration {
       });
 
       // Sort by last accessed (most recent first)
-      items.sort((a, b) => {
-        const ctxA = contexts.find(c => c.id === a.id);
-        const ctxB = contexts.find(c => c.id === b.id);
+      items.sort((a: any, b: any) => {
+        const ctxA = contexts.find((c: any) => c.id === a.id);
+        const ctxB = contexts.find((c: any) => c.id === b.id);
         if (ctxA && ctxB) {
           return ctxB.lastAccessed.getTime() - ctxA.lastAccessed.getTime();
         }
@@ -626,7 +626,7 @@ export class CommandPaletteIntegration {
     }
 
     try {
-      const success = await this.workspaceContextManager.switchToContext(contextId);
+      const success = await this.workspaceContextManager.switchToContext(contextId!);
       if (!success) {
         vscode.window.showErrorMessage('Failed to switch workspace context');
       }
@@ -703,7 +703,7 @@ export class CommandPaletteIntegration {
       }
 
       // Create quick pick items for each context
-      const items = contexts.map(ctx => {
+      const items = contexts.map((ctx: any) => {
         const connection = this.connectionManager.getConnection(ctx.connectionId);
         return {
           label: ctx.name,
@@ -735,7 +735,7 @@ export class CommandPaletteIntegration {
     }
 
     try {
-      const success = await this.workspaceContextManager.deleteContext(contextId);
+      const success = await this.workspaceContextManager.deleteContext(contextId!);
       if (success) {
         vscode.window.showInformationMessage('Workspace context deleted');
       } else {
@@ -763,7 +763,7 @@ export class CommandPaletteIntegration {
       }
 
       // Create quick pick items for each context
-      const items = contexts.map(ctx => {
+      const items = contexts.map((ctx: any) => {
         const connection = this.connectionManager.getConnection(ctx.connectionId);
         return {
           label: ctx.name,
@@ -786,7 +786,7 @@ export class CommandPaletteIntegration {
 
     // Get the context
     const contexts = this.workspaceContextManager.getAllContexts();
-    const context = contexts.find(ctx => ctx.id === contextId);
+    const context = contexts.find((ctx: any) => ctx.id === contextId);
     if (!context) {
       vscode.window.showErrorMessage('Workspace context not found');
       return;
@@ -804,7 +804,7 @@ export class CommandPaletteIntegration {
     }
 
     try {
-      const success = await this.workspaceContextManager.updateContext(contextId, { name: newName });
+      const success = await this.workspaceContextManager.updateContext(contextId!, { name: newName });
       if (success) {
         vscode.window.showInformationMessage(`Workspace context renamed to '${newName}'`);
       } else {

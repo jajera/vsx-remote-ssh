@@ -14,9 +14,13 @@ import { ExtensionHostBridgeExtension } from './vscode/extension-host-bridge-ext
 import { SSHErrorClassifier } from './ssh/error-classifier';
 import { ConnectionStateManagerImpl } from './ssh/connection-state-manager';
 import { CommandPaletteIntegration } from './vscode/command-palette-integration';
+<<<<<<< HEAD
 import { MountTerminalCommands } from './vscode/mount-terminal-commands';
 import { MountSourceControlCommands } from './vscode/mount-source-control-commands';
 import { WorkspaceContextManager } from './vscode/workspace-context-manager';
+=======
+import { WorkspaceContextManagerImpl } from './vscode/workspace-context-manager';
+>>>>>>> 3679f3c (feat: add remote folder mount feature)
 import { NotificationService, NotificationLevel } from './vscode/notification-service';
 import { PerformanceMonitor } from './ssh/performance-monitor';
 
@@ -33,9 +37,13 @@ export class SSHRemoteExtension {
   private errorClassifier: SSHErrorClassifier;
   private stateManager: ConnectionStateManagerImpl;
   private commandPaletteIntegration: CommandPaletteIntegration;
+<<<<<<< HEAD
   private mountTerminalCommands: MountTerminalCommands | undefined;
   private mountSourceControlCommands: MountSourceControlCommands | undefined;
   private workspaceContextManager: WorkspaceContextManager;
+=======
+  private workspaceContextManager: WorkspaceContextManagerImpl;
+>>>>>>> 3679f3c (feat: add remote folder mount feature)
   private notificationService: NotificationService;
   private performanceMonitor: PerformanceMonitor;
   private disposables: vscode.Disposable[] = [];
@@ -84,11 +92,7 @@ export class SSHRemoteExtension {
     this.extensionBridgeExt = new ExtensionHostBridgeExtension(this.connectionManager);
     
     // Initialize workspace context manager
-    this.workspaceContextManager = new WorkspaceContextManager(
-      context,
-      this.connectionManager,
-      this.configManager
-    );
+    this.workspaceContextManager = new WorkspaceContextManagerImpl();
     
     // Initialize command palette integration with workspace context manager
     this.commandPaletteIntegration = new CommandPaletteIntegration(

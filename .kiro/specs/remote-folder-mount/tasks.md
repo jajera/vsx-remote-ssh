@@ -103,14 +103,22 @@
   - Write tests for search functionality
   - _Requirements: 4.1, 4.2_
 
+<<<<<<< HEAD
 - [x] 7.2 Add terminal integration
+=======
+- [ ] 7.2 Add terminal integration
+>>>>>>> 3679f3c (feat: add remote folder mount feature)
   - Implement opening terminals in mounted folders
   - Create terminal path resolution for mounts
   - Add terminal session management for mounts
   - Write tests for terminal integration
   - _Requirements: 4.3_
 
+<<<<<<< HEAD
 - [x] 7.3 Implement source control integration
+=======
+- [ ] 7.3 Implement source control integration
+>>>>>>> 3679f3c (feat: add remote folder mount feature)
   - Add support for Git operations in mounted folders
   - Handle source control status for remote files
   - Create source control commands for mounted folders
@@ -118,36 +126,57 @@
   - _Requirements: 4.5_
 
 - [ ] 8. Add comprehensive error handling and user experience
+<<<<<<< HEAD
 - [x] 8.1 Implement mount-specific error handling
+=======
+- [ ] 8.1 Implement mount-specific error handling
+>>>>>>> 3679f3c (feat: add remote folder mount feature)
   - Create user-friendly error messages for mount operations
   - Add troubleshooting guidance for common errors
   - Implement error recovery options
   - Write tests for error scenarios
   - _Requirements: 1.5, 5.3_
 
+<<<<<<< HEAD
 - [x] 8.2 Add performance monitoring and optimization
+=======
+- [ ] 8.2 Add performance monitoring and optimization
+>>>>>>> 3679f3c (feat: add remote folder mount feature)
   - Implement performance metrics for mount operations
   - Create adaptive caching based on usage patterns
   - Add network condition detection and adaptation
   - Write performance tests and benchmarks
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
 
+<<<<<<< HEAD
 - [x] 9. Create comprehensive test suite
 - [x] 9.1 Implement integration tests
+=======
+- [ ] 9. Create comprehensive test suite
+- [ ] 9.1 Implement integration tests
+>>>>>>> 3679f3c (feat: add remote folder mount feature)
   - Create end-to-end tests for mount workflows
   - Add tests for file operations on mounted folders
   - Implement connection handling tests
   - Write tests for workspace integration
   - _Requirements: All requirements_
 
+<<<<<<< HEAD
 - [x] 9.2 Add user experience tests
+=======
+- [ ] 9.2 Add user experience tests
+>>>>>>> 3679f3c (feat: add remote folder mount feature)
   - Create tests for explorer integration
   - Add tests for command accessibility
   - Implement tests for error handling
   - Write tests for performance perception
   - _Requirements: All requirements_
 
+<<<<<<< HEAD
 - [x] 10. Update documentation and prepare for release
+=======
+- [ ] 10. Update documentation and prepare for release
+>>>>>>> 3679f3c (feat: add remote folder mount feature)
   - Update README with mount feature documentation
   - Create usage examples and screenshots
   - Add troubleshooting guide for mount issues

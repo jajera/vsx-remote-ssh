@@ -57,8 +57,18 @@ class MockUri {
     if (!rest) {
       return new MockUri('file', '', value, '', '');
     }
-    const [authority, path] = rest.split('/', 2);
-    return new MockUri(scheme, authority, '/' + (path || ''), '', '');
+    const firstSlash = rest.indexOf('/');
+    if (firstSlash === -1) {
+      return new MockUri(scheme, rest, '/', '', '');
+    }
+    const authority = rest.substring(0, firstSlash);
+    const path = rest.substring(firstSlash);
+    return new MockUri(scheme, authority, path, '', '');
+  }
+
+  static joinPath(base: MockUri, ...segments: string[]): MockUri {
+    const newPath = base.path + '/' + segments.join('/');
+    return new MockUri(base.scheme, base.authority, newPath, base.query, base.fragment);
   }
 
   toString(): string {
@@ -91,6 +101,88 @@ const FileType = {
   Directory: 2,
   SymbolicLink: 64
 };
+
+// Mock FileChangeType enum
+const FileChangeType = {
+  Changed: 1,
+  Created: 2,
+  Deleted: 3
+};
+
+// Mock Range
+class MockRange {
+  constructor(
+    public start: { line: number; character: number },
+    public end: { line: number; character: number }
+  ) {}
+}
+
+// Mock Progress
+interface MockProgress<T> {
+  report(value: T): void;
+}
+
+// Mock CancellationToken
+interface MockCancellationToken {
+  isCancellationRequested: boolean;
+}
+
+// Mock search interfaces
+interface TextSearchQuery {
+  pattern: string;
+  isRegExp?: boolean;
+  isCaseSensitive?: boolean;
+}
+
+interface TextSearchOptions {
+  includes?: string[];
+  excludes?: string[];
+  folder?: MockUri;
+}
+
+interface TextSearchMatch {
+  text: string;
+  matches: MockRange[];
+}
+
+interface TextSearchResult {
+  uri: MockUri;
+  ranges: MockRange[];
+  preview: TextSearchMatch;
+}
+
+interface TextSearchComplete {
+  limitHit: boolean;
+}
+
+interface FileSearchQuery {
+  pattern?: string;
+  isCaseSensitive?: boolean;
+}
+
+interface FileSearchOptions {
+  includes?: string[];
+  excludes?: string[];
+  folder?: MockUri;
+}
+
+// Mock search providers
+interface TextSearchProvider {
+  provideTextSearchResults(
+    query: TextSearchQuery,
+    options: TextSearchOptions,
+    progress: MockProgress<TextSearchResult>,
+    token: MockCancellationToken
+  ): Promise<TextSearchComplete>;
+}
+
+interface FileSearchProvider {
+  provideFileSearchResults(
+    query: FileSearchQuery,
+    options: FileSearchOptions,
+    token: MockCancellationToken
+  ): Promise<MockUri[]>;
+}
 
 // Mock StatusBarAlignment enum
 const StatusBarAlignment = {
@@ -198,8 +290,19 @@ export {
   MockEventEmitter as EventEmitter,
   MockMarkdownString as MarkdownString,
   MockDisposable as Disposable,
+  MockRange as Range,
   FileType,
-  StatusBarAlignment
+  FileChangeType,
+  StatusBarAlignment,
+  TextSearchQuery,
+  TextSearchOptions,
+  TextSearchMatch,
+  TextSearchResult,
+  TextSearchComplete,
+  FileSearchQuery,
+  FileSearchOptions,
+  TextSearchProvider,
+  FileSearchProvider
 };
 
 // Mock the default export

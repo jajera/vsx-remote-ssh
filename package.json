@@ -52,6 +52,10 @@
     "onCommand:remote-ssh.clearCache",
     "onCommand:remote-ssh.exportConfiguration",
     "onCommand:remote-ssh.importConfiguration",
+    "onCommand:remote-ssh.mountFolder",
+    "onCommand:remote-ssh.unmountFolder",
+    "onCommand:remote-ssh.manageMounts",
+    "onCommand:remote-ssh.refreshMount",
     "onCommand:remote-ssh.test"
   ],
   "main": "./out/extension.js",
@@ -153,11 +157,156 @@
         "category": "Remote SSH"
       },
       {
+        "command": "remote-ssh.mountFolder",
+        "title": "Mount Remote Folder",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.unmountFolder",
+        "title": "Unmount Remote Folder",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.manageMounts",
+        "title": "Manage Mounted Folders",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.refreshMount",
+        "title": "Refresh Mounted Folder",
+        "category": "Remote SSH"
+      },
+      {
         "command": "remote-ssh.test",
         "title": "Test SSH Extension",
         "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.contextMenu.mountFolder",
+        "title": "Mount Folder",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.contextMenu.connect",
+        "title": "Connect",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.contextMenu.disconnect",
+        "title": "Disconnect",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.contextMenu.openTerminal",
+        "title": "Open Terminal",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.contextMenu.showConnectionInfo",
+        "title": "Show Connection Info",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.contextMenu.unmountFolder",
+        "title": "Unmount Folder",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.contextMenu.refreshMount",
+        "title": "Refresh Mount",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.contextMenu.reconnectMount",
+        "title": "Reconnect Mount",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.contextMenu.configureMountOptions",
+        "title": "Configure Mount Options",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.contextMenu.openMountTerminal",
+        "title": "Open Terminal Here",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.contextMenu.showMountInfo",
+        "title": "Show Mount Info",
+        "category": "Remote SSH"
       }
     ],
+    "views": {
+      "explorer": [
+        {
+          "id": "remote-ssh.connections",
+          "name": "SSH Connections",
+          "when": "true"
+        }
+      ]
+    },
+    "menus": {
+      "view/item/context": [
+        {
+          "command": "remote-ssh.contextMenu.mountFolder",
+          "when": "view == remote-ssh.connections && viewItem == sshConnection",
+          "group": "mount@1"
+        },
+        {
+          "command": "remote-ssh.contextMenu.connect",
+          "when": "view == remote-ssh.connections && viewItem == sshConnection",
+          "group": "connection@1"
+        },
+        {
+          "command": "remote-ssh.contextMenu.disconnect",
+          "when": "view == remote-ssh.connections && viewItem == sshConnection",
+          "group": "connection@2"
+        },
+        {
+          "command": "remote-ssh.contextMenu.openTerminal",
+          "when": "view == remote-ssh.connections && viewItem == sshConnection",
+          "group": "terminal@1"
+        },
+        {
+          "command": "remote-ssh.contextMenu.showConnectionInfo",
+          "when": "view == remote-ssh.connections && viewItem == sshConnection",
+          "group": "info@1"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "remote-ssh.contextMenu.unmountFolder",
+          "when": "resourceScheme == ssh-mount",
+          "group": "mount@1"
+        },
+        {
+          "command": "remote-ssh.contextMenu.refreshMount",
+          "when": "resourceScheme == ssh-mount",
+          "group": "mount@2"
+        },
+        {
+          "command": "remote-ssh.contextMenu.reconnectMount",
+          "when": "resourceScheme == ssh-mount",
+          "group": "mount@3"
+        },
+        {
+          "command": "remote-ssh.contextMenu.configureMountOptions",
+          "when": "resourceScheme == ssh-mount",
+          "group": "mount@4"
+        },
+        {
+          "command": "remote-ssh.contextMenu.openMountTerminal",
+          "when": "resourceScheme == ssh-mount",
+          "group": "terminal@1"
+        },
+        {
+          "command": "remote-ssh.contextMenu.showMountInfo",
+          "when": "resourceScheme == ssh-mount",
+          "group": "info@1"
+        }
+      ]
+    },
     "configuration": {
       "title": "Remote SSH",
       "properties": {
@@ -206,6 +355,8 @@
     "markdown-it": "^13.0.1",
     "markdownlint-cli": "^0.45.0",
     "rimraf": "^5.0.1",
+    "sinon": "^21.0.0",
+    "sinon-chai": "^4.0.0",
     "ts-node": "^10.9.1",
     "typedoc": "^0.26.0",
     "typescript": "^5.4.5",

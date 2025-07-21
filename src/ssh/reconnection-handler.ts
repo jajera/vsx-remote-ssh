@@ -1,423 +1,283 @@
 import * as vscode from 'vscode';
-import { 
-  SSHConnection, 
-  ConnectionStatus, 
-  ConnectionState,
-  SSHError,
-  SSHErrorType,
-  SSHConfig
-} from '../interfaces/ssh';
-import { ConnectionStateManager } from './connection-state-manager';
-
-// Default reconnection settings
-const defaultMaxReconnectAttempts = 5;
-const defaultReconnectBackoffFactor = 2;
-const defaultReconnectInitialDelayMs = 1000;
-const defaultReconnectMaxDelayMs = 60000;
-const defaultReconnectTimeoutMs = 30000;
+import { MountManager, MountPoint, MountStatus } from '../interfaces/mount';
+import { SSHConnectionManager } from '../interfaces/ssh';
 
 /**
- * Interface for the reconnection handler
+ * Configuration for reconnection handling
  */
-export interface ReconnectionHandler {
+export interface ReconnectionConfig {
   /**
-   * Attempts to reconnect to a disconnected SSH connection
-   * @param connection The connection to reconnect
-   * @returns Promise that resolves when reconnection is successful or rejects after max attempts
+   * Maximum number of reconnection attempts
    */
-  attemptReconnection(connection: SSHConnection): Promise<void>;
+  maxReconnectionAttempts: number;
   
   /**
-   * Handles SSH errors and determines if reconnection should be attempted
-   * @param error The error that occurred
-   * @param connection The connection that experienced the error
-   * @returns Promise that resolves when error is handled
+   * Initial delay before first reconnection attempt (ms)
    */
-  handleSSHError(error: Error, connection: SSHConnection): Promise<void>;
+  initialReconnectionDelay: number;
   
   /**
-   * Checks if a connection is healthy and attempts reconnection if needed
-   * @param connection The connection to check
-   * @returns Promise that resolves when health check is complete
+   * Maximum delay between reconnection attempts (ms)
    */
-  checkConnectionHealth(connection: SSHConnection): Promise<void>;
+  maxReconnectionDelay: number;
   
   /**
-   * Shows troubleshooting steps for an SSH error
-   * @param error The SSH error to show troubleshooting steps for
+   * Factor to increase delay by after each attempt
    */
-  showTroubleshootingSteps(error: SSHError): void;
+  reconnectionBackoffFactor: number;
   
   /**
-   * Attempts to reconnect with a timeout
-   * @param connection The connection to reconnect
-   * @param timeoutMs Timeout in milliseconds
-   * @returns Promise that resolves when reconnection is successful or rejects after timeout
+   * Whether to show notifications for reconnection attempts
    */
-  attemptReconnectionWithTimeout(connection: SSHConnection, timeoutMs?: number): Promise<void>;
+  showReconnectionNotifications: boolean;
   
   /**
-   * Registers a callback to be called when a connection is reconnected
-   * @param connectionId The ID of the connection to watch
-   * @param callback The callback to call when the connection is reconnected
-   * @returns A disposable that can be used to unregister the callback
+   * Whether to automatically reconnect when connection is lost
    */
-  onReconnected(connectionId: string, callback: () => void): { dispose: () => void };
+  autoReconnect: boolean;
 }
 
 /**
- * Implementation of the reconnection handler
+ * Default configuration for reconnection handling
  */
-export class ReconnectionHandlerImpl implements ReconnectionHandler {
-  private stateManager: ConnectionStateManager;
-  private reconnectionCallbacks: Map<string, Set<() => void>> = new Map();
+export const DefaultReconnectionConfig: ReconnectionConfig = {
+  maxReconnectionAttempts: 5,
+  initialReconnectionDelay: 1000, // 1 second
+  maxReconnectionDelay: 30000, // 30 seconds
+  reconnectionBackoffFactor: 1.5,
+  showReconnectionNotifications: true,
+  autoReconnect: true
+};
+
+/**
+ * Status of a reconnection attempt
+ */
+export enum ReconnectionStatus {
+  NotAttempted = 'not_attempted',
+  InProgress = 'in_progress',
+  Succeeded = 'succeeded',
+  Failed = 'failed',
+  Cancelled = 'cancelled'
+}
+
+/**
+ * Information about a reconnection attempt
+ */
+export interface ReconnectionAttempt {
+  mountId: string;
+  connectionId: string;
+  attemptNumber: number;
+  status: ReconnectionStatus;
+  startTime: Date;
+  endTime?: Date;
+  error?: Error;
+}
+
+/**
+ * Handler for reconnecting to remote mounts when connection is lost
+ */
+export class ReconnectionHandler {
+  private mountManager: MountManager;
+  private connectionManager: SSHConnectionManager;
+  private config: ReconnectionConfig;
+  private reconnectionAttempts: Map<string, ReconnectionAttempt> = new Map();
   private reconnectionTimers: Map<string, NodeJS.Timeout> = new Map();
-  private readonly defaultMaxReconnectAttempts = 5;
-  private readonly defaultReconnectBackoffFactor = 2;
-  private readonly defaultReconnectInitialDelayMs = 1000;
-  private readonly defaultReconnectMaxDelayMs = 60000;
   
-  // Track active reconnection attempts to prevent duplicates
-  private activeReconnections: Set<string> = new Set();
+  private readonly _onDidChangeReconnectionStatus = new vscode.EventEmitter<ReconnectionAttempt>();
+  readonly onDidChangeReconnectionStatus = this._onDidChangeReconnectionStatus.event;
   
   /**
-   * Creates a new reconnection handler
-   * @param stateManager The connection state manager
+   * Create a new ReconnectionHandler
+   * @param mountManager Mount manager
+   * @param connectionManager SSH connection manager
+   * @param config Configuration for reconnection handling
    */
-  constructor(stateManager: ConnectionStateManager) {
-    this.stateManager = stateManager;
-  }
-  
-  /**
-   * Calculates the delay for reconnection attempts using exponential backoff with jitter
-   * @param attemptCount Current attempt number (0-based)
-   * @param initialDelayMs Initial delay in milliseconds
-   * @param backoffFactor Factor to multiply delay by for each attempt
-   * @param maxDelayMs Maximum delay in milliseconds
-   * @returns Delay in milliseconds
-   */
-  private calculateBackoffDelay(
-    attemptCount: number,
-    initialDelayMs: number,
-    backoffFactor: number,
-    maxDelayMs: number
-  ): number {
-    // Calculate base delay using exponential backoff
-    const baseDelay = initialDelayMs * Math.pow(backoffFactor, attemptCount);
-    
-    // Apply jitter (random value between 0-50% of the base delay)
-    // This helps prevent reconnection storms when multiple clients reconnect simultaneously
-    const jitter = baseDelay * 0.5 * Math.random();
-    
-    // Return the delay with jitter, capped at maxDelayMs
-    return Math.min(baseDelay + jitter, maxDelayMs);
-  }
-  
-  /**
-   * Determines if reconnection should be attempted based on error type
-   * @param errorType The type of SSH error
-   * @returns True if reconnection should be stopped, false if it should continue
-   */
-  private shouldStopRetrying(errorType: SSHErrorType): boolean {
-    // Don't retry for certain error types
-    const nonRetryableErrors = [
-      SSHErrorType.AuthenticationFailed,
-      SSHErrorType.PermissionDenied,
-      SSHErrorType.KeyRejected,
-      SSHErrorType.PasswordRejected,
-      SSHErrorType.ConfigurationError
-    ];
-    
-    return nonRetryableErrors.includes(errorType);
-  }
-  
-  /**
-   * Classifies an SSH error by type and provides troubleshooting steps
-   * @param error The error to classify
-   * @param connectionId Optional connection ID
-   * @returns Classified SSH error
-   */
-  private classifySSHError(error: Error, connectionId?: string): SSHError {
-    const errorMessage = error.message.toLowerCase();
-    const timestamp = new Date();
-    
-    // Connection errors
-    if (errorMessage.includes('connect etimedout') || errorMessage.includes('timeout')) {
-      return {
-        type: SSHErrorType.NetworkTimeout,
-        message: 'Connection timed out while trying to reach the server',
-        originalError: error,
-        timestamp,
-        connectionId,
-        troubleshootingSteps: [
-          'Check if the server is online and reachable',
-          'Verify that the hostname and port are correct',
-          'Check if there are any firewalls blocking the connection',
-          'Try increasing the connection timeout in settings'
-        ]
-      };
-    }
-    
-    if (errorMessage.includes('connect econnrefused') || errorMessage.includes('connection refused')) {
-      return {
-        type: SSHErrorType.ConnectionRefused,
-        message: 'Connection refused by the server',
-        originalError: error,
-        timestamp,
-        connectionId,
-        troubleshootingSteps: [
-          'Verify that the SSH service is running on the server',
-          'Check if the port number is correct',
-          'Ensure that the server\'s firewall allows SSH connections',
-          'Try connecting with a different SSH client to verify the issue'
-        ]
-      };
-    }
-    
-    if (errorMessage.includes('host unreachable') || errorMessage.includes('no route to host')) {
-      return {
-        type: SSHErrorType.HostUnreachable,
-        message: 'Cannot reach the host server',
-        originalError: error,
-        timestamp,
-        connectionId,
-        troubleshootingSteps: [
-          'Check your network connection',
-          'Verify that the hostname is correct',
-          'Try connecting to the server from another network',
-          'Check if the server is behind a VPN or firewall'
-        ]
-      };
-    }
-    
-    if (errorMessage.includes('getaddrinfo') || errorMessage.includes('dns')) {
-      return {
-        type: SSHErrorType.DNSResolutionFailed,
-        message: 'Failed to resolve the hostname',
-        originalError: error,
-        timestamp,
-        connectionId,
-        troubleshootingSteps: [
-          'Check if the hostname is spelled correctly',
-          'Verify your DNS settings',
-          'Try using an IP address instead of a hostname',
-          'Check if your DNS server is functioning properly'
-        ]
-      };
-    }
-    
-    // Authentication errors
-    if (errorMessage.includes('authentication failed') || errorMessage.includes('auth failed')) {
-      return {
-        type: SSHErrorType.AuthenticationFailed,
-        message: 'Authentication failed',
-        originalError: error,
-        timestamp,
-        connectionId,
-        troubleshootingSteps: [
-          'Verify that your username is correct',
-          'Check if your password or SSH key is correct',
-          'Ensure that your SSH key is properly configured on the server',
-          'Check if the server allows your authentication method'
-        ]
-      };
-    }
-    
-    if (errorMessage.includes('permission denied')) {
-      return {
-        type: SSHErrorType.PermissionDenied,
-        message: 'Permission denied by the server',
-        originalError: error,
-        timestamp,
-        connectionId,
-        troubleshootingSteps: [
-          'Verify that your user account has permission to access the server',
-          'Check if your SSH key is added to the authorized_keys file on the server',
-          'Ensure that the permissions on your SSH key files are correct (chmod 600)',
-          'Check the server\'s SSH configuration for any restrictions'
-        ]
-      };
-    }
-    
-    if (errorMessage.includes('key') && (errorMessage.includes('rejected') || errorMessage.includes('invalid'))) {
-      return {
-        type: SSHErrorType.KeyRejected,
-        message: 'SSH key was rejected by the server',
-        originalError: error,
-        timestamp,
-        connectionId,
-        troubleshootingSteps: [
-          'Verify that the correct SSH key is being used',
-          'Check if the key is added to the authorized_keys file on the server',
-          'Ensure that the key format is supported by the server',
-          'Try regenerating your SSH key pair'
-        ]
-      };
-    }
-    
-    if (errorMessage.includes('password') && (errorMessage.includes('rejected') || errorMessage.includes('incorrect'))) {
-      return {
-        type: SSHErrorType.PasswordRejected,
-        message: 'Password was rejected by the server',
-        originalError: error,
-        timestamp,
-        connectionId,
-        troubleshootingSteps: [
-          'Verify that your password is correct',
-          'Check if the server allows password authentication',
-          'Ensure that your account is not locked due to too many failed attempts',
-          'Try resetting your password on the server'
-        ]
-      };
-    }
-    
-    // Protocol errors
-    if (errorMessage.includes('protocol') || errorMessage.includes('handshake')) {
-      return {
-        type: SSHErrorType.ProtocolError,
-        message: 'SSH protocol error occurred',
-        originalError: error,
-        timestamp,
-        connectionId,
-        troubleshootingSteps: [
-          'Check if the server supports the SSH protocol version',
-          'Verify that the server is configured correctly',
-          'Try connecting with a different SSH client',
-          'Check server logs for more details'
-        ]
-      };
-    }
-    
-    // Default unknown error
-    return {
-      type: SSHErrorType.Unknown,
-      message: error.message,
-      originalError: error,
-      timestamp,
-      connectionId,
-      troubleshootingSteps: [
-        'Check the error message for clues',
-        'Verify your connection settings',
-        'Try connecting with a different SSH client',
-        'Contact your system administrator if the problem persists'
-      ]
+  constructor(
+    mountManager: MountManager,
+    connectionManager: SSHConnectionManager,
+    config: Partial<ReconnectionConfig> = {}
+  ) {
+    this.mountManager = mountManager;
+    this.connectionManager = connectionManager;
+    this.config = {
+      ...DefaultReconnectionConfig,
+      ...config
     };
+    
+    // Listen for mount status changes
+    this.mountManager.onDidChangeMountPoints(this.handleMountPointsChanged.bind(this));
+    
+    // Note: Connection status changes will be handled by the connection manager
+    // when it implements proper event emission
   }
   
   /**
-   * Gets the maximum number of reconnection attempts from configuration
-   * @returns Maximum number of reconnection attempts
+   * Handle changes to mount points
+   * @param mountPoints Updated mount points
    */
-  private getMaxReconnectAttempts(): number {
-    return vscode.workspace.getConfiguration('remote-ssh').get('reconnectAttempts', this.defaultMaxReconnectAttempts);
-  }
-  
-  /**
-   * Gets the reconnection backoff factor from configuration
-   * @returns Reconnection backoff factor
-   */
-  private getReconnectBackoffFactor(): number {
-    return vscode.workspace.getConfiguration('remote-ssh').get('reconnectBackoffFactor', this.defaultReconnectBackoffFactor);
-  }
-  
-  /**
-   * Gets the initial reconnection delay from configuration
-   * @returns Initial reconnection delay in milliseconds
-   */
-  private getReconnectInitialDelayMs(): number {
-    return vscode.workspace.getConfiguration('remote-ssh').get('reconnectInitialDelayMs', this.defaultReconnectInitialDelayMs);
-  }
-  
-  /**
-   * Gets the maximum reconnection delay from configuration
-   * @returns Maximum reconnection delay in milliseconds
-   */
-  private getReconnectMaxDelayMs(): number {
-    return vscode.workspace.getConfiguration('remote-ssh').get('reconnectMaxDelayMs', this.defaultReconnectMaxDelayMs);
-  }
-  
-  /**
-   * Updates the connection state with the provided updates
-   * @param connection The connection to update
-   * @param updates Partial updates to apply to the connection state
-   * @returns Promise that resolves when the state is updated
-   */
-  private async updateConnectionState(
-    connection: SSHConnection, 
-    updates: Partial<ConnectionState> = {}
-  ): Promise<void> {
-    if (this.stateManager) {
-      await this.stateManager.updateConnectionState(connection.id, {
-        status: connection.status,
-        lastActivity: new Date(),
-        ...updates
-      });
+  private handleMountPointsChanged(mountPoints: MountPoint[]): void {
+    // Check for disconnected mounts that need reconnection
+    for (const mountPoint of mountPoints) {
+      if (mountPoint.status === MountStatus.Disconnected && 
+          mountPoint.options.autoReconnect &&
+          this.config.autoReconnect) {
+        this.scheduleReconnection(mountPoint);
+      }
     }
   }
   
   /**
-   * Attempts to reconnect to a disconnected SSH connection using exponential backoff
-   * @param connection The connection to reconnect
-   * @returns Promise that resolves when reconnection is successful or rejects after max attempts
+   * Handle changes to connection status
+   * @param connectionId ID of the connection
+   * @param status New status
    */
-  public async attemptReconnection(connection: SSHConnection): Promise<void> {
-    // Prevent multiple reconnection attempts for the same connection
-    if (this.activeReconnections.has(connection.id)) {
-      console.log(`Reconnection already in progress for ${connection.config.host}`);
+  private handleConnectionStatusChanged(connectionId: string, status: string): void {
+    // If connection is disconnected, check for affected mounts
+    if (status === 'disconnected') {
+      const mountPoints = this.mountManager.getMountPoints();
+      
+      for (const mountPoint of mountPoints) {
+        if (mountPoint.connectionId === connectionId && 
+            mountPoint.status === MountStatus.Connected) {
+          // Update mount status to disconnected
+          this.mountManager.updateMountStatus(mountPoint.id, MountStatus.Disconnected);
+          
+          // Schedule reconnection if auto-reconnect is enabled
+          if (mountPoint.options.autoReconnect && this.config.autoReconnect) {
+            this.scheduleReconnection(mountPoint);
+          }
+        }
+      }
+    } else if (status === 'connected') {
+      // If connection is connected, check for affected mounts
+      const mountPoints = this.mountManager.getMountPoints();
+      
+      for (const mountPoint of mountPoints) {
+        if (mountPoint.connectionId === connectionId && 
+            mountPoint.status === MountStatus.Disconnected) {
+          // Update mount status to connected
+          this.mountManager.updateMountStatus(mountPoint.id, MountStatus.Connected);
+          
+          // Cancel any pending reconnection attempts
+          this.cancelReconnection(mountPoint.id);
+        }
+      }
+    }
+  }
+  
+  /**
+   * Schedule a reconnection attempt for a mount
+   * @param mountPoint Mount point to reconnect
+   * @param attemptNumber Current attempt number (defaults to 1)
+   */
+  private scheduleReconnection(mountPoint: MountPoint, attemptNumber: number = 1): void {
+    // Check if we've reached the maximum number of attempts
+    if (attemptNumber > this.config.maxReconnectionAttempts) {
+      console.log(`Maximum reconnection attempts reached for mount ${mountPoint.id}`);
+      
+      // Create a failed reconnection attempt
+      const attempt: ReconnectionAttempt = {
+        mountId: mountPoint.id,
+        connectionId: mountPoint.connectionId,
+        attemptNumber,
+        status: ReconnectionStatus.Failed,
+        startTime: new Date(),
+        endTime: new Date(),
+        error: new Error('Maximum reconnection attempts reached')
+      };
+      
+      this.reconnectionAttempts.set(mountPoint.id, attempt);
+      this._onDidChangeReconnectionStatus.fire(attempt);
+      
+      // Show notification if enabled
+      if (this.config.showReconnectionNotifications) {
+        vscode.window.showErrorMessage(
+          `Failed to reconnect to mount "${mountPoint.displayName}" after ${attemptNumber - 1} attempts.`,
+          'Retry'
+        ).then(selection => {
+          if (selection === 'Retry') {
+            // Reset attempt counter and try again
+            this.scheduleReconnection(mountPoint, 1);
+          }
+        });
+      }
+      
       return;
     }
     
-    // Mark this connection as having an active reconnection attempt
-    this.activeReconnections.add(connection.id);
+    // Calculate delay for this attempt using exponential backoff
+    const delay = Math.min(
+      this.config.initialReconnectionDelay * Math.pow(this.config.reconnectionBackoffFactor, attemptNumber - 1),
+      this.config.maxReconnectionDelay
+    );
+    
+    // Cancel any existing timer
+    this.cancelReconnection(mountPoint.id);
+    
+    // Create a reconnection attempt
+    const attempt: ReconnectionAttempt = {
+      mountId: mountPoint.id,
+      connectionId: mountPoint.connectionId,
+      attemptNumber,
+      status: ReconnectionStatus.NotAttempted,
+      startTime: new Date()
+    };
+    
+    this.reconnectionAttempts.set(mountPoint.id, attempt);
+    
+    // Schedule the reconnection
+    const timer = setTimeout(() => {
+      this.attemptReconnection(mountPoint, attemptNumber);
+    }, delay);
+    
+    this.reconnectionTimers.set(mountPoint.id, timer);
+    
+    // Show notification if enabled and this is the first attempt
+    if (this.config.showReconnectionNotifications && attemptNumber === 1) {
+      vscode.window.showInformationMessage(
+        `Connection lost to mount "${mountPoint.displayName}". Attempting to reconnect...`
+      );
+    }
+    
+    console.log(`Scheduled reconnection attempt ${attemptNumber} for mount ${mountPoint.id} in ${delay}ms`);
+  }
+  
+  /**
+   * Attempt to reconnect to a mount
+   * @param mountPoint Mount point to reconnect
+   * @param attemptNumber Current attempt number
+   */
+  private async attemptReconnection(mountPoint: MountPoint, attemptNumber: number): Promise<void> {
+    console.log(`Attempting reconnection ${attemptNumber} for mount ${mountPoint.id}`);
+    
+    // Update the reconnection attempt status
+    const attempt = this.reconnectionAttempts.get(mountPoint.id);
+    if (attempt) {
+      attempt.status = ReconnectionStatus.InProgress;
+      this._onDidChangeReconnectionStatus.fire(attempt);
+    }
     
     try {
-      // Get reconnection settings from config or use defaults
-      const maxAttempts = connection.config.maxReconnectAttempts || this.getMaxReconnectAttempts();
-      const initialDelay = connection.config.reconnectInitialDelayMs || this.getReconnectInitialDelayMs();
-      const backoffFactor = connection.config.reconnectBackoffFactor || this.getReconnectBackoffFactor();
-      const maxDelay = connection.config.reconnectMaxDelayMs || this.getReconnectMaxDelayMs();
+      // Get the connection
+      const connection = this.connectionManager.getConnection(mountPoint.connectionId);
       
-      // Get current reconnect attempts from state manager or use 0
-      let reconnectAttempts = 0;
-      if (this.stateManager) {
-        const state = await this.stateManager.getConnectionState(connection.id);
-        reconnectAttempts = state?.reconnectAttempts || 0;
-      }
-
-      // Update connection status to reconnecting
-      connection.status = ConnectionStatus.Reconnecting;
-      
-      // Notify user that reconnection is being attempted
-      const cancelPromise = vscode.window.showInformationMessage(
-        `Attempting to reconnect to ${connection.config.host}...`,
-        'Cancel'
-      ).then(selection => {
-        if (selection === 'Cancel') {
-          // If user cancels, stop reconnection attempts
-          connection.status = ConnectionStatus.Disconnected;
-          console.log(`Reconnection to ${connection.config.host} cancelled by user`);
-          return true;
-        }
-        return false;
-      });
-      
-      // Update connection state
-      if (this.stateManager) {
-        await this.stateManager.updateConnectionState(connection.id, {
-          status: ConnectionStatus.Reconnecting,
-          reconnectAttempts
-        });
-      }
-
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      // Check if reconnection was cancelled
-      if (connection.status !== ConnectionStatus.Reconnecting) {
-        throw new Error('Reconnection cancelled by user');
+      if (!connection) {
+        throw new Error(`Connection ${mountPoint.connectionId} not found`);
       }
       
-      try {
-        console.log(`Attempting to reconnect to ${connection.config.host} (attempt ${attempt}/${maxAttempts})`);
+      // Check if the connection is already connected
+      if (connection.status === 'connected') {
+        // Update mount status
+        this.mountManager.updateMountStatus(mountPoint.id, MountStatus.Connected);
         
+        // Update the reconnection attempt status
+        if (attempt) {
+          attempt.status = ReconnectionStatus.Succeeded;
+          attempt.endTime = new Date();
+          this._onDidChangeReconnectionStatus.fire(attempt);
+        }
+        
+<<<<<<< HEAD
         // Show progress notification for current attempt
         vscode.window.showInformationMessage(
           `Reconnection attempt ${attempt}/${maxAttempts} to ${connection.config.host}...`
@@ -609,143 +469,121 @@ export class ReconnectionHandlerImpl implements ReconnectionHandler {
         sshError.troubleshootingSteps.forEach(step => {
           markdown.appendMarkdown(`- ${step}\n`);
         });
-      }
-      
-      // Add error details
-      markdown.appendMarkdown('\n## Error details:\n\n');
-      markdown.appendMarkdown(`- **Error type**: ${sshError.type}\n`);
-      markdown.appendMarkdown(`- **Timestamp**: ${sshError.timestamp.toLocaleString()}\n`);
-      
-      // Show the troubleshooting information in a new editor
-      vscode.workspace.openTextDocument({
-        content: markdown.value,
-        language: 'markdown'
-      }).then(doc => {
-        vscode.window.showTextDocument(doc);
-      });
-    } catch (error) {
-      // Fallback for tests or if vscode API is not available
-      console.log('Troubleshooting steps:');
-      console.log(sshError.troubleshootingSteps);
-    }
-  }
-
-  /**
-   * Attempts to reconnect with a timeout
-   * @param connection The connection to reconnect
-   * @param timeoutMs Timeout in milliseconds
-   * @returns Promise that resolves when reconnection is successful or rejects after timeout
-   */
-  public async attemptReconnectionWithTimeout(connection: SSHConnection, timeoutMs: number = defaultReconnectTimeoutMs): Promise<void> {
-    // Create a promise that rejects after the timeout
-    const timeoutPromise = new Promise<void>((_, reject) => {
-      const timeoutId = setTimeout(() => {
-        reject(new Error(`Reconnection to ${connection.config.host} timed out after ${timeoutMs}ms`));
-      }, timeoutMs);
-      
-      // Ensure the timeout is cleared if the reconnection succeeds
-      return () => clearTimeout(timeoutId);
-    });
-
-    // Create a promise for the reconnection attempt
-    const reconnectPromise = this.attemptReconnection(connection);
-
-    // Race the reconnection against the timeout
-    try {
-      await Promise.race([reconnectPromise, timeoutPromise]);
-      
-      // If reconnection succeeded before timeout, make sure we notify any callbacks
-      if (connection.status === ConnectionStatus.Connected) {
-        this.notifyReconnected(connection.id);
-      }
-    } catch (error) {
-      // If the error is from the timeout, update the connection status
-      if ((error as Error).message.includes('timed out')) {
-        connection.status = ConnectionStatus.Error;
-        
-        // Update connection state
-        if (this.stateManager) {
-          await this.stateManager.updateConnectionState(connection.id, {
-            status: ConnectionStatus.Error,
-            lastError: {
-              type: SSHErrorType.NetworkTimeout,
-              message: `Reconnection timed out after ${timeoutMs}ms`,
-              timestamp: new Date(),
-              connectionId: connection.id,
-              troubleshootingSteps: [
-                'Check if the server is online and reachable',
-                'Verify that the hostname and port are correct',
-                'Check if there are any firewalls blocking the connection',
-                'Try increasing the connection timeout in settings'
-              ]
-            }
-          });
+=======
+        // Show notification if enabled
+        if (this.config.showReconnectionNotifications) {
+          vscode.window.showInformationMessage(
+            `Successfully reconnected to mount "${mountPoint.displayName}".`
+          );
         }
         
-        // Show error notification
-        vscode.window.showErrorMessage(
-          `Reconnection to ${connection.config.host} timed out after ${timeoutMs / 1000} seconds`,
-          'Retry',
-          'Cancel'
-        ).then(selection => {
-          if (selection === 'Retry') {
-            this.attemptReconnectionWithTimeout(connection, timeoutMs).catch(err => {
-              console.error('Retry failed:', err);
-            });
-          }
-        });
+        return;
+>>>>>>> 3679f3c (feat: add remote folder mount feature)
       }
       
-      throw error;
-    }
-  }
-
-  /**
-   * Registers a callback to be called when a connection is reconnected
-   * @param connectionId The ID of the connection to watch
-   * @param callback The callback to call when the connection is reconnected
-   * @returns A disposable that can be used to unregister the callback
-   */
-  public onReconnected(connectionId: string, callback: () => void): { dispose: () => void } {
-    // Initialize the set of callbacks for this connection if it doesn't exist
-    if (!this.reconnectionCallbacks.has(connectionId)) {
-      this.reconnectionCallbacks.set(connectionId, new Set());
-    }
-    
-    // Add the callback to the set
-    this.reconnectionCallbacks.get(connectionId)!.add(callback);
-    
-    // Return a disposable that removes the callback when disposed
-    return {
-      dispose: () => {
-        const callbacks = this.reconnectionCallbacks.get(connectionId);
-        if (callbacks) {
-          callbacks.delete(callback);
-          
-          // Clean up the map entry if there are no more callbacks
-          if (callbacks.size === 0) {
-            this.reconnectionCallbacks.delete(connectionId);
-          }
-        }
+      // Try to reconnect
+      await this.connectionManager.reconnect(mountPoint.connectionId);
+      
+      // Update mount status
+      this.mountManager.updateMountStatus(mountPoint.id, MountStatus.Connected);
+      
+      // Update the reconnection attempt status
+      if (attempt) {
+        attempt.status = ReconnectionStatus.Succeeded;
+        attempt.endTime = new Date();
+        this._onDidChangeReconnectionStatus.fire(attempt);
       }
-    };
-  }
-
-  /**
-   * Notifies all registered callbacks that a connection has been reconnected
-   * @param connectionId The ID of the connection that was reconnected
-   */
-  private notifyReconnected(connectionId: string): void {
-    const callbacks = this.reconnectionCallbacks.get(connectionId);
-    if (callbacks) {
-      // Call each callback
-      callbacks.forEach(callback => {
-        try {
-          callback();
-        } catch (error) {
-          console.error(`Error in reconnection callback for connection ${connectionId}:`, error);
-        }
-      });
+      
+      // Show notification if enabled
+      if (this.config.showReconnectionNotifications) {
+        vscode.window.showInformationMessage(
+          `Successfully reconnected to mount "${mountPoint.displayName}".`
+        );
+      }
+    } catch (error) {
+      console.error(`Reconnection attempt ${attemptNumber} failed for mount ${mountPoint.id}:`, error);
+      
+      // Update the reconnection attempt status
+      if (attempt) {
+        attempt.status = ReconnectionStatus.Failed;
+        attempt.endTime = new Date();
+        attempt.error = error as Error;
+        this._onDidChangeReconnectionStatus.fire(attempt);
+      }
+      
+      // Schedule another attempt
+      this.scheduleReconnection(mountPoint, attemptNumber + 1);
     }
+  }
+  
+  /**
+   * Cancel a reconnection attempt
+   * @param mountId ID of the mount
+   */
+  cancelReconnection(mountId: string): void {
+    // Clear the timer
+    const timer = this.reconnectionTimers.get(mountId);
+    if (timer) {
+      clearTimeout(timer);
+      this.reconnectionTimers.delete(mountId);
+    }
+    
+    // Update the reconnection attempt status
+    const attempt = this.reconnectionAttempts.get(mountId);
+    if (attempt && attempt.status !== ReconnectionStatus.Succeeded) {
+      attempt.status = ReconnectionStatus.Cancelled;
+      attempt.endTime = new Date();
+      this._onDidChangeReconnectionStatus.fire(attempt);
+    }
+  }
+  
+  /**
+   * Manually trigger a reconnection attempt for a mount
+   * @param mountId ID of the mount to reconnect
+   */
+  async reconnect(mountId: string): Promise<void> {
+    const mountPoint = this.mountManager.getMountPointById(mountId);
+    if (!mountPoint) {
+      throw new Error(`Mount point not found: ${mountId}`);
+    }
+    
+    // Cancel any pending reconnection attempts
+    this.cancelReconnection(mountId);
+    
+    // Update mount status
+    this.mountManager.updateMountStatus(mountId, MountStatus.Connecting);
+    
+    // Attempt reconnection
+    await this.attemptReconnection(mountPoint, 1);
+  }
+  
+  /**
+   * Get the current reconnection status for a mount
+   * @param mountId ID of the mount
+   * @returns Reconnection attempt if available, undefined otherwise
+   */
+  getReconnectionStatus(mountId: string): ReconnectionAttempt | undefined {
+    return this.reconnectionAttempts.get(mountId);
+  }
+  
+  /**
+   * Get all current reconnection attempts
+   * @returns Map of mount IDs to reconnection attempts
+   */
+  getAllReconnectionAttempts(): Map<string, ReconnectionAttempt> {
+    return new Map(this.reconnectionAttempts);
+  }
+  
+  /**
+   * Dispose the reconnection handler
+   */
+  dispose(): void {
+    // Clear all timers
+    for (const timer of this.reconnectionTimers.values()) {
+      clearTimeout(timer);
+    }
+    
+    this.reconnectionTimers.clear();
+    this.reconnectionAttempts.clear();
   }
 }
