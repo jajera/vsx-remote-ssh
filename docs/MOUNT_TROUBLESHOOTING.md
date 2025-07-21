@@ -401,6 +401,7 @@ This document provides solutions for common issues you might encounter when usin
 3. **Set bandwidth limits**
 
    - Limit the maximum bandwidth usage:
+
      ```json
      "remote-ssh.mount.maxBandwidth": 1048576
      ```
