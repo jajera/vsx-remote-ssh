@@ -2,7 +2,7 @@
   "name": "vsx-remote-ssh",
   "displayName": "Remote SSH",
   "description": "Connect to and develop on remote servers via SSH",
-  "version": "1.0.11",
+  "version": "1.1.0",
   "publisher": "jajera",
   "repository": {
     "type": "git",
@@ -52,7 +52,11 @@
     "onCommand:remote-ssh.clearCache",
     "onCommand:remote-ssh.exportConfiguration",
     "onCommand:remote-ssh.importConfiguration",
-    "onCommand:remote-ssh.test"
+    "onCommand:remote-ssh.test",
+    "onCommand:remote-ssh.mountRemoteFolder",
+    "onCommand:remote-ssh.unmountRemoteFolder",
+    "onCommand:remote-ssh.showMountPerformanceStats",
+    "onCommand:remote-ssh.optimizeMountPerformance"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -156,6 +160,86 @@
         "command": "remote-ssh.test",
         "title": "Test SSH Extension",
         "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.mountRemoteFolder",
+        "title": "Mount Remote Folder",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.unmountRemoteFolder",
+        "title": "Unmount Remote Folder",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.showMountPerformanceStats",
+        "title": "Show Mount Performance Stats",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.optimizeMountPerformance",
+        "title": "Optimize Mount Performance",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.openTerminalInMount",
+        "title": "Open Terminal in Mount",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.openTerminalInCurrentFolder",
+        "title": "Open Terminal in Current Folder",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.openTerminalWithPath",
+        "title": "Open Terminal with Path",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.initializeGitRepository",
+        "title": "Initialize Git Repository",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.gitStatus",
+        "title": "Git Status",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.gitAdd",
+        "title": "Git Add",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.gitCommit",
+        "title": "Git Commit",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.gitPush",
+        "title": "Git Push",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.gitPull",
+        "title": "Git Pull",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.gitCheckout",
+        "title": "Git Checkout",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.gitBranch",
+        "title": "Git Branch",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.refreshSourceControl",
+        "title": "Refresh Source Control",
+        "category": "Remote SSH"
       }
     ],
     "configuration": {
@@ -175,6 +259,36 @@
           "type": "number",
           "default": 3,
           "description": "Number of automatic reconnection attempts"
+        },
+        "remote-ssh.mount.cacheSize": {
+          "type": "number",
+          "default": 50,
+          "description": "Cache size for mounted folders in MB"
+        },
+        "remote-ssh.mount.cacheTTL": {
+          "type": "number",
+          "default": 300000,
+          "description": "Cache TTL for mounted folders in milliseconds"
+        },
+        "remote-ssh.mount.prefetchEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable prefetching for mounted folders"
+        },
+        "remote-ssh.mount.compressionEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable compression for mounted folders"
+        },
+        "remote-ssh.mount.autoReconnect": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically reconnect mounted folders"
+        },
+        "remote-ssh.mount.watchExcludePatterns": {
+          "type": "array",
+          "default": ["**/node_modules/**", "**/.git/**"],
+          "description": "Patterns to exclude from file watching in mounted folders"
         }
       }
     }
@@ -201,11 +315,12 @@
     "@typescript-eslint/eslint-plugin": "^5.45.0",
     "@typescript-eslint/parser": "^5.45.0",
     "@vscode/vsce": "^2.32.0",
-    "chai-sinon": "^2.8.1",
+    "chai": "^4.3.7",
     "eslint": "^8.57.1",
     "markdown-it": "^13.0.1",
     "markdownlint-cli": "^0.45.0",
     "rimraf": "^5.0.1",
+    "sinon-chai": "^3.7.0",
     "ts-node": "^10.9.1",
     "typedoc": "^0.26.0",
     "typescript": "^5.4.5",
