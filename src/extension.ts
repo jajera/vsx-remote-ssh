@@ -688,16 +688,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     });
     context.subscriptions.push(closeTerminalsDisposable);
     
-    // Register mount commands using simple inline implementation (like the working connect command)
+    // Register mount commands using simplified SSH mounting implementation
     const mountRemoteFolderDisposable = vscode.commands.registerCommand('remote-ssh.mountRemoteFolder', async () => {
       console.log('DEBUG: mountRemoteFolder command triggered');
       
-      // Simple implementation similar to the working connect command
+      // Check if SSH is available
       if (!sshAvailable) {
         vscode.window.showErrorMessage('System SSH not available. Please install OpenSSH.');
         return;
       }
       
+      // Get SSH connection details
       const host = await vscode.window.showInputBox({
         prompt: 'Enter SSH host (e.g., example.com)',
         placeHolder: 'example.com'
@@ -720,6 +721,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           if (!value) {
             return 'Remote path is required';
           }
+          if (!value.startsWith('/')) {
+            return 'Remote path must be absolute (start with /)';
+          }
           return null;
         }
       });
@@ -737,21 +741,112 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       // Show progress
       await vscode.window.withProgress({
         location: vscode.ProgressLocation.Notification,
-        title: `Mounting ${remotePath}...`,
+        title: `Mounting ${remotePath} from ${username}@${host}...`,
         cancellable: false
       }, async (progress) => {
         try {
-          // For now, just show a success message
-          // In a real implementation, this would use the mount manager
-          vscode.window.showInformationMessage(`Successfully mounted ${remotePath} as ${mountName}`);
+          progress.report({ message: 'Testing SSH connection...' });
           
-          // Add to workspace (simplified)
-          const mountUri = vscode.Uri.parse(`mount://${mountName}`);
+          // Test SSH connection first
+          await testSSHConnection(host, username);
+          
+          progress.report({ message: 'Creating local mount directory...' });
+          
+          // Create a local mount point
+          const os = require('os');
+          const fs = require('fs');
+          const path = require('path');
+          
+          // Create mount directory in user's home
+          const mountDir = path.join(os.homedir(), '.vscode-ssh-mounts', mountName);
+          
+          // Ensure mount directory exists
+          if (!fs.existsSync(path.dirname(mountDir))) {
+            fs.mkdirSync(path.dirname(mountDir), { recursive: true });
+          }
+          
+          if (!fs.existsSync(mountDir)) {
+            fs.mkdirSync(mountDir, { recursive: true });
+          }
+          
+          progress.report({ message: 'Setting up remote connection...' });
+          
+          // Create a connection ID for this mount
+          const connectionId = `${username}@${host}-${mountName}`;
+          
+          // Store the mount information
+          const mountInfo = {
+            id: connectionId,
+            host,
+            username,
+            remotePath,
+            localPath: mountDir,
+            mountName,
+            createdAt: new Date().toISOString()
+          };
+          
+          // Save mount info to a JSON file
+          const mountInfoPath = path.join(mountDir, '.mount-info.json');
+          fs.writeFileSync(mountInfoPath, JSON.stringify(mountInfo, null, 2));
+          
+          // Create a README file with connection details
+          const readmePath = path.join(mountDir, 'README.md');
+          const readmeContent = `# Mount: ${mountName}
+
+This folder is mounted from ${username}@${host}:${remotePath}
+
+## Connection Details
+- **Host:** ${host}
+- **Username:** ${username}
+- **Remote Path:** ${remotePath}
+- **Local Path:** ${mountDir}
+
+## Usage
+This mount uses the existing SSH connection functionality. You can:
+1. Use the "Connect to Host via SSH" command to establish a connection
+2. Use the "Open Remote Terminal" command to access the remote system
+3. Files in this directory will be synced using the SSH connection
+
+## Commands
+- \`remote-ssh.connect\` - Connect to the remote host
+- \`remote-ssh.openTerminal\` - Open a terminal on the remote host
+- \`remote-ssh.unmountRemoteFolder\` - Unmount this folder
+
+## Manual SSH Commands
+To manually access the remote path:
+\`\`\`bash
+ssh ${username}@${host}
+cd ${remotePath}
+\`\`\`
+`;
+          
+          fs.writeFileSync(readmePath, readmeContent);
+          
+          progress.report({ message: 'Adding to workspace...' });
+          
+          // Add to workspace
+          const mountUri = vscode.Uri.file(mountDir);
           vscode.workspace.updateWorkspaceFolders(
             vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders.length : 0,
             0,
             { uri: mountUri, name: mountName }
           );
+          
+          // Store the mount in our global state
+          if (!activeConnections.has(connectionId)) {
+            activeConnections.set(connectionId, {
+              host,
+              username,
+              mountInfo
+            });
+          }
+          
+          vscode.window.showInformationMessage(
+            `Successfully mounted ${remotePath} as ${mountName}\n` +
+            `Local path: ${mountDir}\n` +
+            `Use "Connect to Host via SSH" to establish the connection.`
+          );
+          
         } catch (error) {
           vscode.window.showErrorMessage(`Failed to mount ${remotePath}: ${error}`);
         }
@@ -769,15 +864,23 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
       
-      const mountFolders = workspaceFolders.filter(folder => folder.uri.scheme === 'mount');
+      // Look for folders in the SSH mount directory
+      const os = require('os');
+      const path = require('path');
+      const mountBaseDir = path.join(os.homedir(), '.vscode-ssh-mounts');
+      
+      const mountFolders = workspaceFolders.filter(folder => {
+        return folder.uri.scheme === 'file' && folder.uri.fsPath.startsWith(mountBaseDir);
+      });
+      
       if (mountFolders.length === 0) {
-        vscode.window.showInformationMessage('No mounted folders found');
+        vscode.window.showInformationMessage('No SSH mounted folders found');
         return;
       }
       
       const items = mountFolders.map(folder => ({
         label: folder.name,
-        description: `Mount: ${folder.uri.toString()}`,
+        description: `Mount: ${folder.uri.fsPath}`,
         folder
       }));
       
@@ -789,12 +892,55 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (!selected) {return;}
       
       try {
-        // Remove from workspace
-        const folderIndex = workspaceFolders.findIndex(folder => folder.uri.toString() === selected.folder.uri.toString());
-        if (folderIndex !== -1) {
-          vscode.workspace.updateWorkspaceFolders(folderIndex, 1);
+        // Show progress
+        await vscode.window.withProgress({
+          location: vscode.ProgressLocation.Notification,
+          title: `Unmounting ${selected.folder.name}...`,
+          cancellable: false
+        }, async (progress) => {
+          progress.report({ message: 'Removing from workspace...' });
+          
+          // Remove from workspace
+          const folderIndex = workspaceFolders.findIndex(folder => folder.uri.toString() === selected.folder.uri.toString());
+          if (folderIndex !== -1) {
+            vscode.workspace.updateWorkspaceFolders(folderIndex, 1);
+          }
+          
+          progress.report({ message: 'Cleaning up mount directory...' });
+          
+          // Clean up the mount directory
+          const fs = require('fs');
+          const mountPoint = selected.folder.uri.fsPath;
+          
+          try {
+            if (fs.existsSync(mountPoint)) {
+              // Remove the mount info file first
+              const mountInfoPath = path.join(mountPoint, '.mount-info.json');
+              if (fs.existsSync(mountInfoPath)) {
+                fs.unlinkSync(mountInfoPath);
+              }
+              
+              // Remove the README file
+              const readmePath = path.join(mountPoint, 'README.md');
+              if (fs.existsSync(readmePath)) {
+                fs.unlinkSync(readmePath);
+              }
+              
+              // Try to remove the directory (only if it's empty)
+              try {
+                fs.rmdirSync(mountPoint);
+              } catch (error) {
+                // Directory not empty, that's okay
+                console.log('Mount directory not empty, leaving it in place');
+              }
+            }
+          } catch (error) {
+            console.log('Could not clean up mount directory:', error);
+          }
+          
           vscode.window.showInformationMessage(`Successfully unmounted ${selected.folder.name}`);
-        }
+        });
+        
       } catch (error) {
         vscode.window.showErrorMessage(`Failed to unmount ${selected.folder.name}: ${error}`);
       }

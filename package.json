@@ -2,7 +2,7 @@
   "name": "vsx-remote-ssh",
   "displayName": "Remote SSH",
   "description": "Connect to and develop on remote servers via SSH",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "publisher": "jajera",
   "repository": {
     "type": "git",
