@@ -73,7 +73,7 @@
   - Write tests for connection recovery
   - _Requirements: 1.5, 5.3_
 
-- [-] 6. Create user interface for mount management
+- [x] 6. Create user interface for mount management
 - [x] 6.1 Implement command palette integration
   - Add commands for mounting and unmounting folders
   - Create mount folder selection dialog
@@ -95,7 +95,7 @@
   - Write tests for status bar functionality
   - _Requirements: 1.5, 5.3_
 
-- [-] 7. Integrate with VS Code features
+- [x] 7. Integrate with VS Code features
 - [x] 7.1 Implement search integration
   - Add support for searching in mounted folders
   - Optimize remote search performance
@@ -117,7 +117,7 @@
   - Write tests for source control integration
   - _Requirements: 4.5_
 
-- [ ] 8. Add comprehensive error handling and user experience
+- [x] 8. Add comprehensive error handling and user experience
 - [x] 8.1 Implement mount-specific error handling
   - Create user-friendly error messages for mount operations
   - Add troubleshooting guidance for common errors

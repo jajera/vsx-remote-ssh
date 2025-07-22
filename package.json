@@ -2,7 +2,7 @@
   "name": "vsx-remote-ssh",
   "displayName": "Remote SSH",
   "description": "Connect to and develop on remote servers via SSH",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "publisher": "jajera",
   "repository": {
     "type": "git",
@@ -33,6 +33,7 @@
     "sftp"
   ],
   "activationEvents": [
+    "*",
     "onCommand:remote-ssh.connect",
     "onCommand:remote-ssh.addHost",
     "onCommand:remote-ssh.disconnect",
@@ -53,6 +54,7 @@
     "onCommand:remote-ssh.exportConfiguration",
     "onCommand:remote-ssh.importConfiguration",
     "onCommand:remote-ssh.test",
+    "onCommand:remote-ssh.test-mount-command",
     "onCommand:remote-ssh.mountRemoteFolder",
     "onCommand:remote-ssh.unmountRemoteFolder",
     "onCommand:remote-ssh.showMountPerformanceStats",
@@ -159,6 +161,11 @@
       {
         "command": "remote-ssh.test",
         "title": "Test SSH Extension",
+        "category": "Remote SSH"
+      },
+      {
+        "command": "remote-ssh.test-mount-command",
+        "title": "Test Mount Command",
         "category": "Remote SSH"
       },
       {
