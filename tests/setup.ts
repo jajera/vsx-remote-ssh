@@ -1,7 +1,7 @@
 // Test setup file for vitest
 import { vi } from 'vitest';
 import * as chai from 'chai';
-import sinonChai from 'chai-sinon';
+import sinonChai from 'sinon-chai';
 
 // Set up chai with sinon plugin
 chai.use(sinonChai);
