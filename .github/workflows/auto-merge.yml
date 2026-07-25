@@ -1,0 +1,17 @@
+name: Auto-merge Dependabot PRs
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  check_suite:
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+
+jobs:
+  auto-merge:
+    uses: actionsforge/actions/.github/workflows/dependabot-auto-merge.yml@main
+    secrets: inherit
